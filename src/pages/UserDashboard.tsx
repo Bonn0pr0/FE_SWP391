@@ -4,16 +4,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar, Clock, MapPin, TrendingUp } from 'lucide-react';
 
+interface Room {
+  id: string;
+  name: string;
+  type: string;
+  capacity: number;
+  campus: 'campus1' | 'campus2';
+}
+
 const UserDashboard = () => {
   const { user } = useAuth();
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedStartTime, setSelectedStartTime] = useState<string>('8');
+  const [selectedEndTime, setSelectedEndTime] = useState<string>('9');
 
   // Filter bookings for current user
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
+
+  const handleCampusChange = (campus: 'campus1' | 'campus2') => {
+    // Campus change handler - update user context if needed
+    console.log('Campus changed to:', campus);
+  };
+
+  const timeSlots = Array.from({ length: 12 }, (_, i) => i + 8); // 8:00 to 19:00
 
   return (
     <div className="min-h-screen bg-background">
@@ -21,14 +42,28 @@ const UserDashboard = () => {
       
       <main className="container py-8 space-y-8 animate-fade-in">
         {/* Welcome Section */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Chào mừng, {user?.email.split('@')[0]}</h1>
             <p className="text-muted-foreground mt-1">
-              {user?.role === 'student' ? 'Sinh viên' : 'Giảng viên'} - {user?.campus === 'campus1' ? 'Campus 1 (Công nghệ cao)' : 'Campus 2 (Nhà văn hóa)'}
+              {user?.role === 'student' ? 'Sinh viên' : 'Giảng viên'}
             </p>
           </div>
-          <Button>Đặt phòng mới</Button>
+          <div className="flex items-center gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="campus" className="text-sm">Chọn Campus</Label>
+              <Select value={user?.campus || 'campus1'} onValueChange={(value: 'campus1' | 'campus2') => handleCampusChange(value)}>
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="campus1">Campus 1 - Công nghệ cao</SelectItem>
+                  <SelectItem value="campus2">Campus 2 - Nhà văn hóa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="mt-7">Đặt phòng mới</Button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -104,9 +139,80 @@ const UserDashboard = () => {
                             <div className="h-3 w-3 rounded-full bg-destructive" />
                             <span className="text-muted-foreground">Đã đặt: 9h-11h, 15h-16h</span>
                           </div>
-                          <Button variant="outline" size="sm" className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors">
-                            Xem chi tiết
-                          </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors"
+                                onClick={() => setSelectedRoom(room)}
+                              >
+                                Xem chi tiết
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px]">
+                              <DialogHeader>
+                                <DialogTitle>{room.name}</DialogTitle>
+                                <DialogDescription>
+                                  {room.type} - Sức chứa: {room.capacity} người
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="booking-date">Chọn ngày</Label>
+                                  <input 
+                                    id="booking-date"
+                                    type="date" 
+                                    className="w-full px-3 py-2 border border-input rounded-md"
+                                    defaultValue={selectedDate}
+                                    aria-label="Chọn ngày đặt phòng"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label>Giờ bắt đầu</Label>
+                                    <Select value={selectedStartTime} onValueChange={setSelectedStartTime}>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {timeSlots.map(hour => (
+                                          <SelectItem key={hour} value={hour.toString()}>
+                                            {hour}:00
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Giờ kết thúc</Label>
+                                    <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {timeSlots.map(hour => (
+                                          <SelectItem key={hour} value={hour.toString()}>
+                                            {hour}:00
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Mục đích sử dụng</Label>
+                                  <textarea 
+                                    className="w-full px-3 py-2 border border-input rounded-md min-h-[80px]"
+                                    placeholder="Nhập mục đích sử dụng phòng..."
+                                  />
+                                </div>
+                                <Button className="w-full">
+                                  Đặt phòng
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </CardContent>
                     </Card>

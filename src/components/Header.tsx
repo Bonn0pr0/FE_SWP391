@@ -20,10 +20,7 @@ export const Header = () => {
           <span className="text-xl font-bold">FPTU Booking</span>
         </Link>
 
-        <nav className="hidden md:flex items-center space-x-6">
-          <Link to="/booking" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-            Đặt phòng
-          </Link>
+        <nav className="hidden md:flex items-center space-x-10">
           <Link to="/details" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
             Chi tiết
           </Link>

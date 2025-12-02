@@ -10,8 +10,9 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, campus?: 'campus1' | 'campus2') => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  updateCampus: (campus: 'campus1' | 'campus2') => void;
   isAuthenticated: boolean;
 }
 
@@ -35,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = async (email: string, password: string, campus?: 'campus1' | 'campus2'): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     // Find user in demo users
     const foundUser = DEMO_USERS.find(
       u => u.email === email && u.password === password
@@ -45,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData: User = {
         email: foundUser.email,
         role: foundUser.role,
-        campus: foundUser.role !== 'admin' ? campus : undefined,
+        campus: foundUser.role !== 'admin' ? 'campus1' : undefined, // Default to campus1
       };
       setUser(userData);
       localStorage.setItem('fptu_user', JSON.stringify(userData));
@@ -55,13 +56,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
+  const updateCampus = (campus: 'campus1' | 'campus2') => {
+    if (user) {
+      const updatedUser = { ...user, campus };
+      setUser(updatedUser);
+      localStorage.setItem('fptu_user', JSON.stringify(updatedUser));
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('fptu_user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateCampus, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

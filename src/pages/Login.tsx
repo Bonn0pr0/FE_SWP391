@@ -12,7 +12,6 @@ import { Building2 } from 'lucide-react';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [campus, setCampus] = useState<'campus1' | 'campus2'>('campus1');
   const { login } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -32,7 +31,7 @@ const Login = () => {
       }
     }
 
-    const success = await login(email, password, campus);
+    const success = await login(email, password);
 
     if (success) {
       toast({
@@ -69,19 +68,6 @@ const Login = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="campus">Campus</Label>
-              <Select value={campus} onValueChange={(value: 'campus1' | 'campus2') => setCampus(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="campus1">Campus 1 - Công nghệ cao</SelectItem>
-                  <SelectItem value="campus2">Campus 2 - Nhà văn hóa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
