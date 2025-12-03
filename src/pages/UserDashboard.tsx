@@ -20,7 +20,7 @@ interface Room {
 }
 
 const UserDashboard = () => {
-  const { user } = useAuth();
+  const { user, updateCampus } = useAuth();
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('8');
@@ -30,8 +30,8 @@ const UserDashboard = () => {
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
 
   const handleCampusChange = (campus: 'campus1' | 'campus2') => {
-    // Campus change handler - update user context if needed
-    console.log('Campus changed to:', campus);
+    // Update campus in auth context so selection persists
+    updateCampus(campus);
   };
 
   const timeSlots = Array.from({ length: 12 }, (_, i) => i + 8); // 8:00 to 19:00
