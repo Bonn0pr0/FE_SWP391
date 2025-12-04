@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { mockDashboardStats, mockBookings, mockRooms, mockChartData } from '@/lib/mockData';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Building2, TrendingUp, TrendingDown, Calendar, XCircle } from 'lucide-react';
+import { Building2, TrendingUp, TrendingDown, Calendar, XCircle, Settings } from 'lucide-react';
+import { RoomTypeManager } from '@/components/RoomTypeManager';
 
 const AdminDashboard = () => {
   const [timeRange, setTimeRange] = useState('7days');
@@ -104,6 +105,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="overview">Tổng quan</TabsTrigger>
             <TabsTrigger value="reports">Báo cáo chi tiết</TabsTrigger>
             <TabsTrigger value="history">Lịch sử booking</TabsTrigger>
+            <TabsTrigger value="room-types" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Loại phòng
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -384,6 +389,11 @@ const AdminDashboard = () => {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Room Types Tab */}
+          <TabsContent value="room-types">
+            <RoomTypeManager />
           </TabsContent>
         </Tabs>
       </main>

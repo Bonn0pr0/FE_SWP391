@@ -8,6 +8,15 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // --- THÊM CẤU HÌNH PROXY TẠI ĐÂY ---
+    proxy: {
+      '/api': {
+        target: 'https://localhost:7104', // Backend .NET của bạn
+        changeOrigin: true,
+        secure: false, // Quan trọng: Bỏ qua lỗi SSL tự ký (sửa lỗi net::ERR_FAILED)
+      },
+    },
+    // ------------------------------------
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

@@ -4,22 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
+// Đảm bảo import đúng đường dẫn tới file AuthContext vừa tạo
+import { useAuth } from '@/contexts/AuthContext'; 
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email domain for non-admin users
+    // 1. Validate email đơn giản
     if (email !== 'admin') {
       if (!email.endsWith('@fpt.edu.vn') && !email.endsWith('@fe.edu.vn')) {
         toast({
@@ -31,24 +33,35 @@ const Login = () => {
       }
     }
 
-    const success = await login(email, password);
+    setIsLoading(true);
+    
+    // 2. Gọi hàm login và nhận lại roleId
+    // Nếu lỗi CORS xảy ra, roleId sẽ là null
+    const roleId = await login(email, password);
 
-    if (success) {
+    setIsLoading(false);
+
+    // 3. Xử lý điều hướng dựa trên Role ID
+    if (roleId !== null) {
       toast({
         title: 'Đăng nhập thành công',
-        description: 'Chào mừng bạn đến với FPTU Booking System',
+        description: `Chào mừng quay trở lại, ${email}`,
       });
 
-      // Redirect based on role
-      if (email === 'admin') {
+      // LOGIC ĐIỀU HƯỚNG
+      if (roleId === 1) {
         navigate('/admin');
-      } else {
+      } else if (roleId === 2 || roleId === 3) {
         navigate('/dashboard');
+      } else {
+        navigate('/dashboard'); 
       }
+
     } else {
+      // Nếu vào đây, có thể do sai pass HOẶC do lỗi CORS
       toast({
         title: 'Đăng nhập thất bại',
-        description: 'Email hoặc mật khẩu không chính xác',
+        description: 'không zo đc Bỏn ơiiii.',
         variant: 'destructive',
       });
     }
@@ -77,6 +90,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -89,21 +103,20 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              Đăng nhập
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                'Đăng nhập'
+              )}
             </Button>
-
-            <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">Tài khoản demo:</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>• Student: nguyenvana@fpt.edu.vn / 123456</p>
-                <p>• Lecturer: nguyenvanb@fe.edu.vn / 123456</p>
-                <p>• Admin: admin / 123456</p>
-              </div>
-            </div>
           </form>
         </CardContent>
       </Card>
