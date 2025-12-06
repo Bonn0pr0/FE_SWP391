@@ -21,6 +21,9 @@ export const Header = () => {
         </Link>
 
         <nav className="hidden md:flex items-center space-x-10">
+          <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+            Đặt phòng
+          </Link>
           <Link to="/details" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
             Chi tiết
           </Link>
@@ -33,7 +36,7 @@ export const Header = () => {
           {isAuthenticated ? (
             <>
               <Button variant="outline" size="sm" asChild>
-                <Link to={user?.role === 'admin' ? '/admin' : '/dashboard'}>
+                <Link to={user?.role === 'admin' ? '/admin' : '/information'}>
                   {user?.email.split('@')[0]}
                 </Link>
               </Button>

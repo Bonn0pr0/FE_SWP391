@@ -119,19 +119,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="container py-16 bg-primary/5">
-        <div className="max-w-2xl mx-auto text-center space-y-6">
-          <h2 className="text-3xl font-bold">Sẵn sàng bắt đầu?</h2>
-          <p className="text-muted-foreground">
-            Đăng nhập ngay để trải nghiệm hệ thống đặt phòng thông minh của FPTU HCM
-          </p>
-          <Button size="lg" asChild>
-            <Link to="/login">Đăng nhập ngay</Link>
-          </Button>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="border-t border-border py-8">
         <div className="container text-center text-sm text-muted-foreground">

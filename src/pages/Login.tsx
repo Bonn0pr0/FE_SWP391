@@ -52,7 +52,7 @@ const Login = () => {
       if (roleId === 1) {
         navigate('/admin');
       } else if (roleId === 2 || roleId === 3) {
-        navigate('/dashboard');
+        navigate('/');
       } else {
         navigate('/dashboard'); 
       }

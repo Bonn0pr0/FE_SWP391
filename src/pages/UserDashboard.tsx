@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,8 +23,17 @@ const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [selectedStartTime, setSelectedStartTime] = useState<string>('8');
-  const [selectedEndTime, setSelectedEndTime] = useState<string>('9');
+  const predefinedSlots = [
+    { id: 1, start: '07:30:00', end: '09:00:00', label: '07:30 - 09:00' },
+    { id: 2, start: '09:10:00', end: '10:40:00', label: '09:10 - 10:40' },
+    { id: 3, start: '10:50:00', end: '12:20:00', label: '10:50 - 12:20' },
+    { id: 4, start: '13:00:00', end: '14:30:00', label: '13:00 - 14:30' },
+    { id: 5, start: '14:40:00', end: '16:10:00', label: '14:40 - 16:10' },
+  ];
+
+  const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
+  const [selectedStartTime, setSelectedStartTime] = useState<string>(predefinedSlots[0].start);
+  const [selectedEndTime, setSelectedEndTime] = useState<string>(predefinedSlots[0].end);
 
   // Filter bookings for current user
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
@@ -34,7 +43,7 @@ const UserDashboard = () => {
     updateCampus(campus);
   };
 
-  const timeSlots = Array.from({ length: 12 }, (_, i) => i + 8); // 8:00 to 19:00
+  // timeSlots replaced by predefinedSlots (fixed ranges)
 
   return (
     <div className="min-h-screen bg-background">
@@ -62,7 +71,7 @@ const UserDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="mt-7">Đặt phòng mới</Button>
+            
           </div>
         </div>
 
@@ -168,36 +177,24 @@ const UserDashboard = () => {
                                     aria-label="Chọn ngày đặt phòng"
                                   />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label>Giờ bắt đầu</Label>
-                                    <Select value={selectedStartTime} onValueChange={setSelectedStartTime}>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {timeSlots.map(hour => (
-                                          <SelectItem key={hour} value={hour.toString()}>
-                                            {hour}:00
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label>Giờ kết thúc</Label>
-                                    <Select value={selectedEndTime} onValueChange={setSelectedEndTime}>
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {timeSlots.map(hour => (
-                                          <SelectItem key={hour} value={hour.toString()}>
-                                            {hour}:00
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                <div className="space-y-2">
+                                  <Label>Chọn khung giờ: </Label>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    {predefinedSlots.map(slot => (
+                                      <Button
+                                        key={slot.id}
+                                        className="w-full"
+                                        variant={selectedSlotId === slot.id ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedSlotId(slot.id);
+                                          setSelectedStartTime(slot.start);
+                                          setSelectedEndTime(slot.end);
+                                        }}
+                                      >
+                                        {slot.label}
+                                      </Button>
+                                    ))}
                                   </div>
                                 </div>
                                 <div className="space-y-2">
@@ -222,80 +219,7 @@ const UserDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Booking History */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Lịch sử đặt phòng</CardTitle>
-            <CardDescription>Các đặt phòng gần đây của bạn</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Phòng</TableHead>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead>Thời gian</TableHead>
-                  <TableHead>Mục đích</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {userBookings.map(booking => (
-                  <TableRow key={booking.id}>
-                    <TableCell className="font-medium">{booking.roomName}</TableCell>
-                    <TableCell>{new Date(booking.date).toLocaleDateString('vi-VN')}</TableCell>
-                    <TableCell>{booking.startTime}:00 - {booking.endTime}:00</TableCell>
-                    <TableCell>{booking.purpose}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          booking.status === 'Approved'
-                            ? 'default'
-                            : booking.status === 'Pending'
-                            ? 'secondary'
-                            : 'destructive'
-                        }
-                      >
-                        {booking.status === 'Approved' ? 'Đã duyệt' :
-                         booking.status === 'Pending' ? 'Chờ duyệt' :
-                         booking.status === 'Rejected' ? 'Từ chối' : 'Đã hủy'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Report Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Báo cáo sử dụng
-            </CardTitle>
-            <CardDescription>Thống kê sử dụng phòng của bạn</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-muted-foreground">Tổng số lần đặt phòng</span>
-                <span className="font-semibold">{userBookings.length} lần</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-muted-foreground">Tỷ lệ đặt phòng thành công</span>
-                <span className="font-semibold">
-                  {((userBookings.filter(b => b.status === 'Approved').length / userBookings.length) * 100).toFixed(0)}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-muted-foreground">Loại phòng thường đặt nhất</span>
-                <span className="font-semibold">Meeting Room</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        
       </main>
     </div>
   );
