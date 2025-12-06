@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Building } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+// URL gốc (đã qua Proxy Vite)
+const API_BASE_URL = '/api/FacilityType';
+
 export interface RoomType {
-  id: string;
+  id: number;
   name: string;
   description: string;
   icon: string;
@@ -20,99 +23,125 @@ export interface RoomType {
   createdAt: string;
 }
 
-const initialRoomTypes: RoomType[] = [
-  {
-    id: 'rt1',
-    name: 'Meeting Room',
-    description: 'Phòng họp dành cho các cuộc họp nhóm, hội nghị nhỏ',
-    icon: '🏢',
-    roomCount: 2,
-    createdAt: '2025-01-01',
-  },
-  {
-    id: 'rt2',
-    name: 'Computer Lab',
-    description: 'Phòng máy tính dành cho học tập và thực hành',
-    icon: '💻',
-    roomCount: 2,
-    createdAt: '2025-01-01',
-  },
-  {
-    id: 'rt3',
-    name: 'Sport Field',
-    description: 'Sân thể thao cho các hoạt động thể dục, thể thao',
-    icon: '⚽',
-    roomCount: 4,
-    createdAt: '2025-01-01',
-  },
-  {
-    id: 'rt4',
-    name: 'Lecture Hall',
-    description: 'Giảng đường lớn dành cho các buổi giảng, hội thảo',
-    icon: '🎓',
-    roomCount: 1,
-    createdAt: '2025-01-01',
-  },
-];
-
 export const RoomTypeManager = () => {
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>(initialRoomTypes);
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '', icon: '🏢' });
   const { toast } = useToast();
 
-  const handleCreate = () => {
+  // 1. GET: Lấy danh sách
+  const fetchRoomTypes = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/GetListType`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) throw new Error(`Lỗi kết nối: ${response.statusText}`);
+      
+      const data = await response.json();
+      
+      const mappedData: RoomType[] = Array.isArray(data) ? data.map((item: any) => ({
+        id: item.typeId,
+        name: item.typeName,
+        description: item.typeDescription || item.description || '',
+        icon: '🏢',
+        roomCount: item.facilitiCount || 0,
+        createdAt: item.createAt || new Date().toISOString()
+      })) : [];
+
+      setRoomTypes(mappedData);
+    } catch (error) {
+      console.error("Fetch Error:", error);
+      toast({ title: 'Lỗi', description: 'Không thể tải dữ liệu', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoomTypes();
+  }, []);
+
+  // 2. POST: Thêm mới
+  const handleCreate = async () => {
     if (!formData.name.trim()) {
       toast({ title: 'Lỗi', description: 'Vui lòng nhập tên loại phòng', variant: 'destructive' });
       return;
     }
 
-    const newRoomType: RoomType = {
-      id: `rt${Date.now()}`,
-      name: formData.name,
-      description: formData.description,
-      icon: formData.icon || '🏢',
-      roomCount: 0,
-      createdAt: new Date().toISOString().split('T')[0],
-    };
+    try {
+      const payload = {
+        typeName: formData.name,
+        description: formData.description,
+      };
 
-    setRoomTypes([...roomTypes, newRoomType]);
-    setFormData({ name: '', description: '', icon: '🏢' });
-    setIsCreateOpen(false);
-    toast({ title: 'Thành công', description: 'Đã thêm loại phòng mới' });
-  };
-
-  const handleEdit = () => {
-    if (!editingType || !formData.name.trim()) {
-      toast({ title: 'Lỗi', description: 'Vui lòng nhập tên loại phòng', variant: 'destructive' });
-      return;
-    }
-
-    setRoomTypes(roomTypes.map(rt => 
-      rt.id === editingType.id 
-        ? { ...rt, name: formData.name, description: formData.description, icon: formData.icon }
-        : rt
-    ));
-    setEditingType(null);
-    setFormData({ name: '', description: '', icon: '🏢' });
-    setIsEditOpen(false);
-    toast({ title: 'Thành công', description: 'Đã cập nhật loại phòng' });
-  };
-
-  const handleDelete = (id: string) => {
-    const roomType = roomTypes.find(rt => rt.id === id);
-    if (roomType && roomType.roomCount > 0) {
-      toast({ 
-        title: 'Không thể xóa', 
-        description: `Loại phòng này đang có ${roomType.roomCount} phòng. Vui lòng xóa các phòng trước.`, 
-        variant: 'destructive' 
+      const response = await fetch(API_BASE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      return;
+
+      if (!response.ok) throw new Error('Thêm thất bại');
+
+      await fetchRoomTypes();
+      setFormData({ name: '', description: '', icon: '🏢' });
+      setIsCreateOpen(false);
+      toast({ title: 'Thành công', description: 'Đã thêm loại phòng mới' });
+    } catch (error) {
+      toast({ title: 'Lỗi', description: 'Có lỗi xảy ra khi thêm mới', variant: 'destructive' });
     }
-    setRoomTypes(roomTypes.filter(rt => rt.id !== id));
-    toast({ title: 'Thành công', description: 'Đã xóa loại phòng' });
+  };
+
+  // --- 3. PUT: Cập nhật (ĐÃ SỬA THEO CURL) ---
+  const handleEdit = async () => {
+    if (!editingType) return;
+
+    try {
+      // Body chỉ chứa thông tin cần sửa (không gửi typeId trong body)
+      const payload = {
+        typeName: formData.name,
+        description: formData.description
+      };
+
+      // URL sử dụng Query Parameter: ?id=...
+      const response = await fetch(`${API_BASE_URL}?id=${editingType.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error('Cập nhật thất bại');
+
+      await fetchRoomTypes();
+      setEditingType(null);
+      setFormData({ name: '', description: '', icon: '🏢' });
+      setIsEditOpen(false);
+      toast({ title: 'Thành công', description: 'Đã cập nhật thông tin' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Lỗi', description: 'Có lỗi xảy ra khi cập nhật', variant: 'destructive' });
+    }
+  };
+
+  // 4. DELETE: Xóa
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Xóa thất bại');
+
+      await fetchRoomTypes();
+      toast({ title: 'Thành công', description: 'Đã xóa loại phòng' });
+    } catch (error) {
+      toast({ title: 'Lỗi', description: 'Không thể xóa loại phòng này', variant: 'destructive' });
+    }
   };
 
   const openEditDialog = (roomType: RoomType) => {
@@ -134,187 +163,175 @@ export const RoomTypeManager = () => {
             </CardTitle>
             <CardDescription>Thêm, sửa, xóa các loại phòng trong hệ thống</CardDescription>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="h-4 w-4" />
-                Thêm loại phòng
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Thêm loại phòng mới</DialogTitle>
-                <DialogDescription>Nhập thông tin loại phòng mới</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Tên loại phòng *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Ví dụ: Meeting Room"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Mô tả</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Mô tả về loại phòng..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Icon</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {iconOptions.map((icon) => (
-                      <button
-                        key={icon}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, icon })}
-                        className={`h-10 w-10 rounded-md text-xl flex items-center justify-center border-2 transition-all ${
-                          formData.icon === icon 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                      >
-                        {icon}
-                      </button>
-                    ))}
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={fetchRoomTypes} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Thêm loại phòng
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Thêm loại phòng mới</DialogTitle>
+                  <DialogDescription>Nhập thông tin loại phòng mới</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Tên loại phòng *</Label>
+                    <Input
+                      id="name"
+                      placeholder="Ví dụ: Meeting Room"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Mô tả</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Mô tả về loại phòng..."
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Icon (Local)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {iconOptions.map((icon) => (
+                        <button
+                          key={icon}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, icon })}
+                          className={`h-10 w-10 rounded-md text-xl flex items-center justify-center border-2 transition-all ${
+                            formData.icon === icon 
+                              ? 'border-primary bg-primary/10' 
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Hủy</Button>
-                <Button onClick={handleCreate}>Thêm</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Hủy</Button>
+                  <Button onClick={handleCreate}>Thêm</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[80px]">Icon</TableHead>
-              <TableHead>Tên loại phòng</TableHead>
-              <TableHead>Mô tả</TableHead>
-              <TableHead className="text-center">Số phòng</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead className="text-right">Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {roomTypes.map((roomType) => (
-              <TableRow key={roomType.id}>
-                <TableCell className="text-2xl">{roomType.icon}</TableCell>
-                <TableCell className="font-medium">{roomType.name}</TableCell>
-                <TableCell className="max-w-[300px] truncate text-muted-foreground">
-                  {roomType.description}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Badge variant="secondary">{roomType.roomCount}</Badge>
-                </TableCell>
-                <TableCell>{new Date(roomType.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(roomType)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Bạn có chắc chắn muốn xóa loại phòng "{roomType.name}"? 
-                            {roomType.roomCount > 0 && (
-                              <span className="block mt-2 text-destructive font-medium">
-                                Cảnh báo: Loại phòng này đang có {roomType.roomCount} phòng.
-                              </span>
-                            )}
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Hủy</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(roomType.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            Xóa
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TableCell>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[80px]">Icon</TableHead>
+                <TableHead>Tên loại phòng</TableHead>
+                <TableHead>Mô tả</TableHead>
+                <TableHead className="text-center">Số phòng</TableHead>
+                <TableHead>Ngày tạo</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {roomTypes.length === 0 ? (
+                 <TableRow>
+                    <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                        Không có dữ liệu
+                    </TableCell>
+                 </TableRow>
+              ) : (
+                roomTypes.map((roomType) => (
+                <TableRow key={roomType.id}>
+                  <TableCell className="text-2xl">{roomType.icon}</TableCell>
+                  <TableCell className="font-medium">{roomType.name}</TableCell>
+                  <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                    {roomType.description}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary">{roomType.roomCount}</Badge>
+                  </TableCell>
+                  <TableCell>{new Date(roomType.createdAt).toLocaleDateString('vi-VN')}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(roomType)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Bạn có chắc chắn muốn xóa "{roomType.name}"?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Hủy</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(roomType.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Xóa
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
-
-      {/* Edit Dialog */}
+      
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
-          <DialogHeader>
+            <DialogHeader>
             <DialogTitle>Sửa loại phòng</DialogTitle>
-            <DialogDescription>Cập nhật thông tin loại phòng</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+            </DialogHeader>
+            <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Tên loại phòng *</Label>
-              <Input
-                id="edit-name"
-                placeholder="Ví dụ: Meeting Room"
+                <Label>Tên loại phòng *</Label>
+                <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+                />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-description">Mô tả</Label>
-              <Textarea
-                id="edit-description"
-                placeholder="Mô tả về loại phòng..."
+                <Label>Mô tả</Label>
+                <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
+                />
             </div>
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <div className="flex flex-wrap gap-2">
-                {iconOptions.map((icon) => (
-                  <button
-                    key={icon}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, icon })}
-                    className={`h-10 w-10 rounded-md text-xl flex items-center justify-center border-2 transition-all ${
-                      formData.icon === icon 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    {icon}
-                  </button>
-                ))}
-              </div>
             </div>
-          </div>
-          <DialogFooter>
+            <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>Hủy</Button>
             <Button onClick={handleEdit}>Lưu</Button>
-          </DialogFooter>
+            </DialogFooter>
         </DialogContent>
-      </Dialog>
+        </Dialog>
     </Card>
   );
 };

@@ -6,6 +6,7 @@ import { AdminOverview } from '@/pages/admin/AdminOverview';
 import { AdminBookingHistory } from '@/pages/admin/AdminBookingHistory';
 import { AdminReports } from '@/pages/admin/AdminReports';
 import { AdminRoomTypes } from '@/pages/admin/AdminRoomTypes';
+import Users from '@/pages/admin/Users';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
@@ -22,6 +23,8 @@ const AdminDashboard = () => {
         return <AdminReports />;
       case 'room-types':
         return <AdminRoomTypes />;
+      case 'users':
+        return <Users />;
       default:
         return <AdminDashboardStats />;
     }
