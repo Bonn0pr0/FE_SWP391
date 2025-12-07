@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,6 +8,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { mockRooms, mockBookings } from '@/lib/mockData';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar, Clock, MapPin, TrendingUp } from 'lucide-react';
 
@@ -21,19 +22,17 @@ interface Room {
 
 const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
+  const [facilityTypes, setFacilityTypes] = useState<any[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const predefinedSlots = [
-    { id: 1, start: '07:30:00', end: '09:00:00', label: '07:30 - 09:00' },
-    { id: 2, start: '09:10:00', end: '10:40:00', label: '09:10 - 10:40' },
-    { id: 3, start: '10:50:00', end: '12:20:00', label: '10:50 - 12:20' },
-    { id: 4, start: '13:00:00', end: '14:30:00', label: '13:00 - 14:30' },
-    { id: 5, start: '14:40:00', end: '16:10:00', label: '14:40 - 16:10' },
-  ];
 
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
-  const [selectedStartTime, setSelectedStartTime] = useState<string>(predefinedSlots[0].start);
-  const [selectedEndTime, setSelectedEndTime] = useState<string>(predefinedSlots[0].end);
+  const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
+  const [selectedEndTime, setSelectedEndTime] = useState<string>('09:00:00');
+  const [purpose, setPurpose] = useState<string>('');
+  const [isBooking, setIsBooking] = useState(false);
+  const { toast } = useToast();
 
   // Filter bookings for current user
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
@@ -44,6 +43,66 @@ const UserDashboard = () => {
   };
 
   // timeSlots replaced by predefinedSlots (fixed ranges)
+
+  useEffect(() => {
+    const fetchFacilityTypes = async () => {
+      // Try proxy first, fallback to direct https if needed
+      const proxyUrl = '/api/FacilityType';
+      const directUrl = '/api/FacilityType';
+
+      try {
+        let res = await fetch(proxyUrl);
+        if (!res.ok) {
+          // try direct
+          res = await fetch(directUrl, { mode: 'cors' });
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          setFacilityTypes(Array.isArray(data) ? data : []);
+        } else {
+          console.warn('FacilityType fetch failed:', res.statusText);
+          toast?.({ title: 'Không lấy được loại phòng', description: 'Server trả về lỗi khi lấy thông tin loại phòng.' });
+        }
+      } catch (err) {
+        console.warn('FacilityType fetch error:', err);
+        toast?.({ title: 'Lỗi mạng', description: 'Không thể kết nối tới API loại phòng.' });
+      }
+    };
+
+    fetchFacilityTypes();
+  }, []);
+
+  useEffect(() => {
+    const fetchSlots = async () => {
+      const proxyUrl = '/api/Slot';
+      const directUrl = '/api/Slot';
+
+      try {
+        let res = await fetch(proxyUrl);
+        if (!res.ok) {
+          res = await fetch(directUrl, { mode: 'cors' });
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          setSlots(Array.isArray(data) ? data : []);
+          // Set first slot as default if available
+          if (Array.isArray(data) && data.length > 0) {
+            setSelectedSlotId(data[0].slotId);
+            setSelectedStartTime(data[0].startTime);
+            setSelectedEndTime(data[0].endTime);
+          }
+        } else {
+          console.warn('Slot fetch failed:', res.statusText);
+        }
+      } catch (err) {
+        console.warn('Slot fetch error:', err);
+      }
+    };
+
+    fetchSlots();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,22 +179,29 @@ const UserDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {mockRooms
-                .filter(room => room.campus === user?.campus)
-                .map((room, idx) => {
+              {(
+                facilityTypes.length
+                  ? facilityTypes.filter((_: any, i: number) => true) // we'll show all facility types
+                  : mockRooms.filter(room => room.campus === user?.campus)
+              ).map((room: any, idx: number) => {
                   const gradients = ['gradient-purple', 'gradient-blue', 'gradient-pink', 'gradient-orange', 'gradient-green'];
                   const gradient = gradients[idx % gradients.length];
                   
+                  // normalize room object when facilityTypes is used
+                  const roomObj = facilityTypes.length
+                    ? { id: String(room.typeId ?? idx), name: room.typeName ?? `Loại ${idx+1}`, type: room.description ?? room.typeName, capacity: 0, campus: 'campus1' }
+                    : room;
+
                   return (
-                    <Card key={room.id} className="overflow-hidden hover:shadow-lg transition-all hover:scale-105">
+                    <Card key={roomObj.id} className="overflow-hidden hover:shadow-lg transition-all hover:scale-105">
                       <div className={`h-2 ${gradient}`} />
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle className="text-lg">{room.name}</CardTitle>
-                            <CardDescription>{room.type}</CardDescription>
+                            <CardTitle className="text-lg">{roomObj.name}</CardTitle>
+                            <CardDescription>{roomObj.type}</CardDescription>
                           </div>
-                          <Badge variant="secondary" className="font-semibold">{room.capacity} chỗ</Badge>
+                          <Badge variant="secondary" className="font-semibold">{roomObj.capacity ?? 0} chỗ</Badge>
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -154,16 +220,16 @@ const UserDashboard = () => {
                                 variant="outline" 
                                 size="sm" 
                                 className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-                                onClick={() => setSelectedRoom(room)}
+                                onClick={() => setSelectedRoom(roomObj)}
                               >
                                 Xem chi tiết
                               </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px]">
                               <DialogHeader>
-                                <DialogTitle>{room.name}</DialogTitle>
+                                <DialogTitle>{roomObj.name}</DialogTitle>
                                 <DialogDescription>
-                                  {room.type} - Sức chứa: {room.capacity} người
+                                  {roomObj.type} - Sức chứa: {roomObj.capacity ?? 0} người
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
@@ -180,21 +246,31 @@ const UserDashboard = () => {
                                 <div className="space-y-2">
                                   <Label>Chọn khung giờ: </Label>
                                   <div className="grid grid-cols-1 gap-2">
-                                    {predefinedSlots.map(slot => (
-                                      <Button
-                                        key={slot.id}
-                                        className="w-full"
-                                        variant={selectedSlotId === slot.id ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedSlotId(slot.id);
-                                          setSelectedStartTime(slot.start);
-                                          setSelectedEndTime(slot.end);
-                                        }}
-                                      >
-                                        {slot.label}
-                                      </Button>
-                                    ))}
+                                    {(slots.length > 0 ? slots : [
+                                      { slotId: 1, startTime: '07:30:00', endTime: '09:00:00' },
+                                      { slotId: 2, startTime: '09:10:00', endTime: '10:40:00' },
+                                      { slotId: 3, startTime: '10:50:00', endTime: '12:20:00' },
+                                      { slotId: 4, startTime: '13:00:00', endTime: '14:30:00' },
+                                      { slotId: 5, startTime: '14:40:00', endTime: '16:10:00' },
+                                    ]).map(slot => {
+                                      const startLabel = slot.startTime.substring(0, 5);
+                                      const endLabel = slot.endTime.substring(0, 5);
+                                      return (
+                                        <Button
+                                          key={slot.slotId}
+                                          className="w-full"
+                                          variant={selectedSlotId === slot.slotId ? 'default' : 'outline'}
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedSlotId(slot.slotId);
+                                            setSelectedStartTime(slot.startTime);
+                                            setSelectedEndTime(slot.endTime);
+                                          }}
+                                        >
+                                          {startLabel} - {endLabel}
+                                        </Button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                                 <div className="space-y-2">
@@ -202,10 +278,51 @@ const UserDashboard = () => {
                                   <textarea 
                                     className="w-full px-3 py-2 border border-input rounded-md min-h-[80px]"
                                     placeholder="Nhập mục đích sử dụng phòng..."
+                                    value={purpose}
+                                    onChange={(e) => setPurpose(e.target.value)}
                                   />
                                 </div>
-                                <Button className="w-full">
-                                  Đặt phòng
+                                <Button className="w-full" disabled={!selectedRoom || isBooking}
+                                  onClick={async () => {
+                                    if (!selectedRoom) return;
+                                    setIsBooking(true);
+                                    const payload = {
+                                      bookingCode: `BK-${Date.now()}`,
+                                      bookingDate: selectedDate,
+                                      purpose: purpose || 'Đặt phòng',
+                                      numberOfMember: selectedRoom.capacity || 0,
+                                      userId: (/* eslint-disable @typescript-eslint/no-explicit-any */ (user as any)?.userId) ?? 0,
+                                      facilityId: selectedRoom.id,
+                                      slotNumber: selectedSlotId,
+                                    };
+
+                                    try {
+                                      const res = await fetch('/api/Booking', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(payload),
+                                      });
+
+                                      if (res.ok) {
+                                        const data = await res.json();
+                                        toast({ title: 'Đặt phòng thành công', description: 'Yêu cầu đặt phòng đã được gửi.' });
+                                        // Optionally add to local mock list
+                                        // add returned booking if provided
+                                        if (data && data.id) {
+                                          mockBookings.push(data);
+                                        }
+                                      } else {
+                                        const text = await res.text();
+                                        toast({ title: 'Lỗi đặt phòng', description: text, variant: 'destructive' });
+                                      }
+                                    } catch (err) {
+                                      toast({ title: 'Lỗi mạng', description: String(err), variant: 'destructive' });
+                                    } finally {
+                                      setIsBooking(false);
+                                    }
+                                  }}
+                                >
+                                  {isBooking ? 'Đang gửi...' : 'Đặt phòng'}
                                 </Button>
                               </div>
                             </DialogContent>

@@ -4,15 +4,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import UserDashboard from "./pages/UserDashboard";
+import Index from "./pages/student/lecture/Index";
+import Login from "./pages/student/lecture/Login";
+import UserDashboard from "./pages/student/lecture/UserDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import Booking from "./pages/Booking";
-import Details from "./pages/Details";
-import Contact from "./pages/Contact";
-import NotFound from "./pages/NotFound";
-import Information from "./pages/Information";
+
+import Details from "./pages/student/lecture/Details";
+import Contact from "./pages/student/lecture/Contact";
+import NotFound from "./pages/student/lecture/NotFound";
+import Information from "./pages/student/lecture/Information";
 
 const queryClient = new QueryClient();
 
@@ -57,7 +57,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/booking" element={<Booking />} />
+      
       <Route path="/details" element={<Details />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/information" element={<Information />} />
