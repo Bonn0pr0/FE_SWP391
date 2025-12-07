@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Check, X, Eye, Loader2, Calendar, Clock, MapPin, Users, Building } from 'lucide-react'; // Thêm icon cho đẹp
+import { Check, X, Eye, Loader2, Calendar, Clock, MapPin, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // --- Cấu hình API ---
-// Lưu ý: Đảm bảo proxy hoặc đường dẫn full URL nếu chạy local khác port
+// Nếu bạn chạy qua Proxy (Vite) thì để tương đối, nếu không thì điền full URL https://localhost:44338/api/Booking
 const API_BASE_URL = '/api/Booking'; 
+
+const CURRENT_ADMIN_ID = 1;
 
 // Interface cho danh sách (Gọn nhẹ)
 interface BookingListItem {
@@ -28,11 +29,11 @@ interface BookingListItem {
   createdAt: string;
 }
 
-// Interface cho Chi tiết (Đầy đủ từ API Detail)
+// Interface cho Chi tiết
 interface BookingDetail {
   bookingId: number;
   bookingCode: string;
-  status: string; // "approve", "Pending", ...
+  status: string;
   createAt: string;
   fullName: string;
   facilityName: string;
@@ -46,7 +47,7 @@ interface BookingDetail {
 }
 
 export const AdminBookingHistory = () => {
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all'); // Giữ lại nếu bạn muốn dùng filter sau này
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   
   // State quản lý danh sách
@@ -59,7 +60,7 @@ export const AdminBookingHistory = () => {
 
   // State quản lý từ chối
   const [rejectReason, setRejectReason] = useState('');
-  const [selectedBookingId, setSelectedBookingId] = useState<string | number | null>(null); // Chỉ lưu ID để xử lý action
+  const [selectedBookingId, setSelectedBookingId] = useState<string | number | null>(null);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   
   const { toast } = useToast();
@@ -110,7 +111,7 @@ export const AdminBookingHistory = () => {
   const handleViewDetail = async (id: number | string) => {
     setIsDetailDialogOpen(true);
     setIsDetailLoading(true);
-    setBookingDetail(null); // Reset dữ liệu cũ
+    setBookingDetail(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/Detail/${id}`);
@@ -127,40 +128,70 @@ export const AdminBookingHistory = () => {
     }
   };
 
-  // --- 3. Xử lý Duyệt/Từ chối ---
+  // --- 3. Xử lý Duyệt/Từ chối (Đã sửa lỗi RejectionReason Required) ---
   const updateBookingStatus = async (bookingId: string | number, newStatus: string, reason: string = "") => {
     try {
-      // Lấy purpose cũ từ list hiện tại để gửi kèm (vì API PUT yêu cầu full object)
-      const currentItem = bookings.find(b => b.id === bookingId);
-      const purpose = currentItem ? currentItem.purpose : "Updated by Admin";
+      // 1. URL setup
+      const url = `${API_BASE_URL}/${bookingId}?currentUserId=${CURRENT_ADMIN_ID}`;
+
+      // 2. Body Payload
+      const payloadStatus = newStatus === 'approve' ? 'approved' : 'rejected';
+
+      // SỬA LỖI TẠI ĐÂY:
+      // Backend yêu cầu trường này bắt buộc (Required).
+      // Không được gửi null. Nếu approve (không có lý do) thì gửi chuỗi rỗng "".
+      const safeReason = reason ? reason : ""; 
 
       const payload = {
-        bookingId: bookingId,
-        status: newStatus,
-        purpose: purpose,
-        // numberOfMember: 50 // Nếu API yêu cầu trường này, cần thêm vào
+        status: payloadStatus,
+        rejectionReason: safeReason 
       };
 
-      const response = await fetch(`${API_BASE_URL}/${bookingId}`, {
-        method: 'PUT', // Sửa lại thành PUT theo đúng chuẩn RESTful (curl cũ bạn gửi là PUT)
-        headers: { 'Content-Type': 'application/json', 'accept': '*/*' },
+      const response = await fetch(url, {
+        method: 'PUT', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'accept': '*/*' 
+        },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Failed to update');
-
-      // Cập nhật UI Local
-      const displayStatus = newStatus === 'approve' ? 'Approved' : 'Rejected';
-      setBookings(prev => prev.map(b => (b.id === bookingId ? { ...b, status: displayStatus as any } : b)));
-      
-      // Nếu đang mở dialog detail, cũng update luôn status trong đó
-      if (bookingDetail && bookingDetail.bookingId === bookingId) {
-          setBookingDetail({ ...bookingDetail, status: newStatus });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error Response:", errorText);
+        throw new Error(errorText || 'Failed to update');
       }
 
-      toast({ title: "Thành công", description: `Đã cập nhật trạng thái booking #${bookingId}` });
+      const data = await response.json();
+
+      // 3. Cập nhật UI
+      let displayStatus: any = 'Pending';
+      const returnedStatus = data.status?.toLowerCase();
+      
+      if (returnedStatus === 'approved') displayStatus = 'Approved';
+      else if (returnedStatus === 'rejected') displayStatus = 'Rejected';
+
+      setBookings(prev => prev.map(b => (b.id === bookingId ? { ...b, status: displayStatus } : b)));
+      
+      if (bookingDetail && bookingDetail.bookingId === Number(bookingId)) {
+          setBookingDetail({ ...bookingDetail, status: data.status });
+      }
+
+      toast({ 
+        title: "Thành công", 
+        description: `Đã cập nhật trạng thái booking #${bookingId}.` 
+      });
+
     } catch (error) {
-      toast({ title: "Lỗi cập nhật", description: "Có lỗi xảy ra.", variant: "destructive" });
+      console.error("Update failed:", error);
+      toast({ 
+        title: "Lỗi cập nhật", 
+        description: "Lỗi Validation từ Server hoặc lỗi kết nối.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsRejectDialogOpen(false);
+      setRejectReason('');
     }
   };
 
@@ -169,8 +200,9 @@ export const AdminBookingHistory = () => {
   const handleRejectConfirm = () => {
     if (selectedBookingId && rejectReason.trim()) {
       updateBookingStatus(selectedBookingId, 'reject', rejectReason);
-      setIsRejectDialogOpen(false);
-      setRejectReason('');
+    } else {
+        // Nếu muốn bắt buộc nhập lý do mới cho reject thì giữ check này
+        toast({ title: "Lỗi", description: "Vui lòng nhập lý do từ chối", variant: "destructive" });
     }
   };
 
@@ -183,7 +215,6 @@ export const AdminBookingHistory = () => {
   const formatTime = (t: string) => t?.split(':').slice(0, 2).join(':') || "";
   const filteredBookings = bookings.filter(b => statusFilter === 'all' || b.status.toLowerCase() === statusFilter);
 
-  // Helper render badge trạng thái
   const renderStatusBadge = (statusStr: string) => {
     const s = statusStr?.toLowerCase();
     let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
@@ -198,7 +229,7 @@ export const AdminBookingHistory = () => {
 
   return (
     <div className="space-y-6">
-      {/* ... Header & Filter (Giữ nguyên) ... */}
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Lịch sử booking</h1>
         <p className="text-muted-foreground mt-1">Quản lý yêu cầu đặt phòng</p>
@@ -206,7 +237,6 @@ export const AdminBookingHistory = () => {
 
       <Card>
         <CardHeader>
-           {/* ... Controls Filter ... */}
            <div className="flex justify-end mb-2">
              <Button variant="outline" size="sm" onClick={fetchBookings} disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Làm mới danh sách"}
@@ -270,7 +300,7 @@ export const AdminBookingHistory = () => {
         </DialogContent>
       </Dialog>
 
-      {/* --- DETAIL DIALOG (Updated) --- */}
+      {/* --- DETAIL DIALOG --- */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -306,7 +336,7 @@ export const AdminBookingHistory = () => {
               {/* Grid Details */}
               <div className="grid grid-cols-2 gap-6">
                  
-                 {/* Cột Trái: Thời gian & Người dùng */}
+                 {/* Cột Trái */}
                  <div className="space-y-4">
                     <div>
                         <h4 className="text-sm font-medium mb-2 text-muted-foreground">Thời gian</h4>
@@ -330,13 +360,13 @@ export const AdminBookingHistory = () => {
                            </div>
                            <div>
                               <p className="font-medium text-sm">{bookingDetail.fullName}</p>
-                              <p className="text-xs text-muted-foreground">ID: {bookingDetail.bookingCode}</p> {/* API chưa trả UserID, dùng tạm Code */}
+                              <p className="text-xs text-muted-foreground">ID: {bookingDetail.bookingCode}</p>
                            </div>
                         </div>
                     </div>
                  </div>
 
-                 {/* Cột Phải: Thông tin phòng & Mục đích */}
+                 {/* Cột Phải */}
                  <div className="space-y-4">
                     <div>
                         <h4 className="text-sm font-medium mb-2 text-muted-foreground">Thông tin phòng</h4>
