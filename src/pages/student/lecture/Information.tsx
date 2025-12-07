@@ -110,8 +110,8 @@ const Information = () => {
               const slotIdNum = slotIdRaw != null ? Number(slotIdRaw) : null;
 
               // prefer explicit time fields on booking, then nested slot, then global slots list
-              let startRaw = b.alertTime ?? b.startTime ?? b.start ?? b.slot?.startTime ?? '';
-              let endRaw = b.endTime ?? b.end ?? b.slot?.endTime ?? '';
+              let startRaw = b.alertTime ?? b.startime ?? b.start ?? b.slot?.startime ?? '';
+              let endRaw = b.endtime ?? b.end ?? b.slot?.endtime ?? '';
 
               if ((!startRaw || !endRaw) && slotIdNum != null && slots.length) {
                 const found = slots.find((s: any) => Number(s.slotId) === slotIdNum || Number(s.slotNumber) === slotIdNum);
@@ -123,11 +123,25 @@ const Information = () => {
 
               // normalize time string to HH:MM if possible
               const normalizeTime = (t: any) => {
-                if (!t && t !== 0) return '';
-                const s = String(t);
-                const m = s.match(/(\d{2}:\d{2})/);
-                if (m) return m[1];
-                return s.substring(0, 5);
+                if (!t) return '';
+                const s = String(t).trim();
+                if (!s) return '';
+                
+                // Match HH:MM:SS or HH:MM format
+                const timeMatch = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+                if (timeMatch) {
+                  const hour = timeMatch[1].padStart(2, '0');
+                  const min = timeMatch[2];
+                  return `${hour}:${min}`;
+                }
+                
+                // If it's a 3-4 digit number like "0730" or "730"
+                if (/^\d{3,4}$/.test(s)) {
+                  const padded = s.padStart(4, '0');
+                  return `${padded.substring(0, 2)}:${padded.substring(2, 4)}`;
+                }
+                
+                return '';
               };
 
               const start = normalizeTime(startRaw);
