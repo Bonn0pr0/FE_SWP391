@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Header } from '@/components/Header';
-import { AdminSidebar, AdminSection } from '@/pages/admin/AdminSidebar';
+import { AdminSidebar, type AdminSection } from '@/pages/admin/AdminSidebar';
 import { AdminDashboardStats } from '@/pages/admin/AdminDashboardStats';
 import { AdminOverview } from '@/pages/admin/AdminOverview';
 import { AdminBookingHistory } from '@/pages/admin/AdminBookingHistory';
 import { AdminReports } from '@/pages/admin/AdminReports';
 import { AdminRoomTypes } from '@/pages/admin/AdminRoomTypes';
+import { AdminRoomManagement } from '@/pages/admin/AdminRoomManagement';
 import Users from '@/pages/admin/Users';
 
 const AdminDashboard = () => {
@@ -23,6 +24,8 @@ const AdminDashboard = () => {
         return <AdminReports />;
       case 'room-types':
         return <AdminRoomTypes />;
+      case 'room-management':
+        return <AdminRoomManagement />;
       case 'users':
         return <Users />;
       default:

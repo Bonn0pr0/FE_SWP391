@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, BarChart3, History, FileText, Settings, User } from 'lucide-react';
+import { LayoutDashboard, BarChart3, History, FileText, Settings, User, Home } from 'lucide-react';
 
-export type AdminSection = 'dashboard' | 'overview' | 'booking-history' | 'reports' | 'room-types' | 'users';
+export type AdminSection = 'dashboard' | 'overview' | 'booking-history' | 'reports' | 'room-management' | 'room-types' | 'users';
 
 interface AdminSidebarProps {
   activeSection: AdminSection;
@@ -13,6 +13,7 @@ const menuItems = [
   { id: 'overview' as AdminSection, label: 'Tổng quan', icon: BarChart3 },
   { id: 'booking-history' as AdminSection, label: 'Lịch sử booking', icon: History },
   { id: 'reports' as AdminSection, label: 'Báo cáo chi tiết', icon: FileText },
+  { id: 'room-management' as AdminSection, label: 'Quản lý phòng', icon: Home },
   { id: 'room-types' as AdminSection, label: 'Loại phòng', icon: Settings },
   { id: 'users' as AdminSection, label: 'Người dùng', icon: User },
 ];
