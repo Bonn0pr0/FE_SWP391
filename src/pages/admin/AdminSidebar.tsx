@@ -9,8 +9,8 @@ interface AdminSidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard' as AdminSection, label: 'Admin Dashboard', icon: LayoutDashboard },
-  { id: 'overview' as AdminSection, label: 'Tổng quan', icon: BarChart3 },
+  // { id: 'dashboard' as AdminSection, label: 'Admin Dashboard', icon: LayoutDashboard },
+  // { id: 'overview' as AdminSection, label: 'Tổng quan', icon: BarChart3 },
   { id: 'booking-history' as AdminSection, label: 'Lịch sử booking', icon: History },
   { id: 'reports' as AdminSection, label: 'Báo cáo chi tiết', icon: FileText },
   { id: 'room-management' as AdminSection, label: 'Quản lý phòng', icon: Home },
