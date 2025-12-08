@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input'; // Đảm bảo bạn đã có component này hoặc dùng thẻ input thường
+import { Input } from '@/components/ui/input';
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,8 +29,6 @@ const UserDashboard = () => {
   const [slots, setSlots] = useState<any[]>([]);
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-
-  // --- MỚI: State cho thanh tìm kiếm ---
   const [searchTerm, setSearchTerm] = useState('');
 
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
@@ -42,8 +40,11 @@ const UserDashboard = () => {
 
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
 
-  const handleCampusChange = (campus: 'campus1' | 'campus2') => {
-    updateCampus(campus);
+  // --- CẬP NHẬT 1: Cho phép tham số là 'all' ---
+  const handleCampusChange = (campus: 'campus1' | 'campus2' | 'all') => {
+    // Ép kiểu về any để bypass check type nghiêm ngặt của updateCampus (nếu context của bạn chưa hỗ trợ 'all')
+    // Nếu context đã hỗ trợ thì bỏ "as any"
+    updateCampus(campus as any);
   };
 
   useEffect(() => {
@@ -56,7 +57,6 @@ const UserDashboard = () => {
         if (!res.ok) {
           res = await fetch(directUrl, { mode: 'cors' });
         }
-
         if (res.ok) {
           const data = await res.json();
           setFacilities(Array.isArray(data) ? data : []);
@@ -66,16 +66,14 @@ const UserDashboard = () => {
         }
       } catch (err) {
         console.warn('Facilities fetch error:', err);
-        setFacilities([]); // Reset về rỗng để fallback sang mockRooms
+        setFacilities([]);
       }
     };
-
     fetchFacilities();
-  }, [user?.campus]); // Re-fetch khi user đổi campus
+  }, [user?.campus]); 
 
   useEffect(() => {
     const fetchSlots = async () => {
-      // ... (Giữ nguyên logic fetch slots)
       const proxyUrl = '/api/Slot';
       try {
         const res = await fetch(proxyUrl);
@@ -93,15 +91,10 @@ const UserDashboard = () => {
     fetchSlots();
   }, []);
 
-  // --- MỚI: Logic Filter và Chuẩn hóa dữ liệu ---
-  // Sử dụng useMemo để tối ưu hiệu năng, tránh tính toán lại mỗi lần render không cần thiết
   const filteredFacilities = useMemo(() => {
-    // 1. Xác định nguồn dữ liệu (API hay Mock)
     const sourceData = facilities.length > 0 ? facilities : mockRooms;
 
-    // 2. Map dữ liệu về chuẩn chung (Interface Room)
     const normalizedData: Room[] = sourceData.map((item: any) => {
-      // Logic xác định campus từ dữ liệu API (thường trả về tên tiếng Việt)
       const isCampus1 = item.campusName 
         ? item.campusName.toLowerCase().includes('công nghệ cao') 
         : item.campus === 'campus1';
@@ -109,7 +102,7 @@ const UserDashboard = () => {
       return {
         id: String(item.facilityId || item.id),
         name: item.facilityCode || item.name,
-        type: item.typeName || item.type || '', // Quan trọng cho việc search
+        type: item.typeName || item.type || '',
         capacity: item.capacity || 0,
         campus: isCampus1 ? 'campus1' : 'campus2',
         equipment: item.equipment,
@@ -118,26 +111,33 @@ const UserDashboard = () => {
       };
     });
 
-    // 3. Thực hiện Filter
     return normalizedData.filter(room => {
-      // Filter theo Campus hiện tại của user
-      const matchCampus = room.campus === user?.campus;
+      // --- CẬP NHẬT 2: Logic lọc mới cho 'all' ---
+      // Nếu user.campus là 'all' thì luôn trả về true (không lọc theo campus)
+      // Ngược lại thì so sánh như cũ
+      const currentCampus = (user as any)?.campus; // Dùng as any để tránh lỗi type nếu interface User chưa có 'all'
+      const matchCampus = currentCampus === 'all' || room.campus === currentCampus;
 
-      // Filter theo Search Term (TypeName)
-      // Tìm kiếm không phân biệt hoa thường
       const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchCampus && matchSearch;
     });
 
-  }, [facilities, user?.campus, searchTerm]); // Chạy lại khi 3 biến này thay đổi
+  }, [facilities, user?.campus, searchTerm]);
+
+  // Helper để hiển thị tên Campus đang chọn
+  const getCampusLabel = () => {
+    const c = (user as any)?.campus;
+    if (c === 'all') return 'Tất cả cơ sở';
+    if (c === 'campus1') return 'Cơ sở 1 - Công nghệ cao';
+    return 'Cơ sở 2 - Nhà văn hóa';
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="container py-8 space-y-8 animate-fade-in">
-        {/* Welcome & Campus Selection Section */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Chào mừng, {user?.email.split('@')[0]}</h1>
@@ -148,11 +148,16 @@ const UserDashboard = () => {
           <div className="flex items-center gap-4">
             <div className="space-y-2">
               <Label htmlFor="campus" className="text-sm">Chọn Campus</Label>
-              <Select value={user?.campus || 'campus1'} onValueChange={(value: 'campus1' | 'campus2') => handleCampusChange(value)}>
+              {/* --- CẬP NHẬT 3: Thêm option 'all' vào Select --- */}
+              <Select 
+                value={(user as any)?.campus || 'campus1'} 
+                onValueChange={(value: 'campus1' | 'campus2' | 'all') => handleCampusChange(value)}
+              >
                 <SelectTrigger className="w-[240px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Xem tất cả</SelectItem>
                   <SelectItem value="campus1">Campus 1 - Cơ sở khu công nghệ cao</SelectItem>
                   <SelectItem value="campus2">Campus 2 - Cơ sở nhà văn hóa</SelectItem>
                 </SelectContent>
@@ -163,7 +168,6 @@ const UserDashboard = () => {
 
         {/* Stats Cards Section */}
         <div className="grid gap-4 md:grid-cols-3">
-           {/* ... (Giữ nguyên phần Stats Card) */}
           <Card className="gradient-purple text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Đặt phòng đang hoạt động</CardTitle>
@@ -193,7 +197,6 @@ const UserDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {/* Hiển thị số lượng sau khi đã filter */}
                 {filteredFacilities.length}
               </div>
             </CardContent>
@@ -207,11 +210,11 @@ const UserDashboard = () => {
               <div>
                 <CardTitle>Phòng khả dụng hôm nay</CardTitle>
                 <CardDescription>
-                  Campus {user?.campus === 'campus1' ? '1 - Công nghệ cao' : '2 - Nhà văn hóa'}
+                  {/* Hiển thị tên campus động */}
+                  {getCampusLabel()}
                 </CardDescription>
               </div>
               
-              {/* --- MỚI: Thanh Search --- */}
               <div className="relative w-full md:w-[300px]">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -222,17 +225,16 @@ const UserDashboard = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {/* ------------------------- */}
             </div>
           </CardHeader>
           <CardContent>
             {filteredFacilities.length === 0 ? (
               <div className="text-center py-10 text-muted-foreground">
-                Không tìm thấy phòng nào phù hợp với từ khóa "{searchTerm}" tại Campus này.
+                Không tìm thấy phòng nào phù hợp với từ khóa "{searchTerm}" 
+                {(user as any)?.campus !== 'all' ? ' tại Campus này.' : '.'}
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {/* Render danh sách đã filter */}
                 {filteredFacilities.map((roomObj, idx) => {
                   const gradients = ['gradient-purple', 'gradient-blue', 'gradient-pink', 'gradient-orange', 'gradient-green'];
                   const gradient = gradients[idx % gradients.length];
@@ -251,6 +253,13 @@ const UserDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
+                          {/* Hiển thị thêm badge Campus nếu đang chọn xem tất cả */}
+                          {(user as any)?.campus === 'all' && (
+                            <Badge variant="outline" className="mb-2 mr-2">
+                              {roomObj.campus === 'campus1' ? 'Khu CNC' : 'Nhà VH'}
+                            </Badge>
+                          )}
+                          
                           {roomObj.equipment && (
                             <div className="text-xs text-muted-foreground mb-2 truncate" title={roomObj.equipment}>
                               🔧 {roomObj.equipment}
@@ -268,7 +277,6 @@ const UserDashboard = () => {
                             </div>
                           )}
                           
-                          {/* Dialog Booking */}
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -286,10 +294,13 @@ const UserDashboard = () => {
                                 <DialogTitle>{roomObj.name}</DialogTitle>
                                 <DialogDescription>
                                   {roomObj.type} - Sức chứa: {roomObj.capacity} người
+                                  <br/>
+                                  <span className="text-xs text-muted-foreground">
+                                    Cơ sở: {roomObj.campus === 'campus1' ? 'Khu Công nghệ cao' : 'Nhà văn hóa'}
+                                  </span>
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
-                                {/* Form đặt phòng (Giữ nguyên) */}
                                 <div className="space-y-2">
                                   <Label htmlFor="booking-date">Chọn ngày</Label>
                                   <input 
@@ -305,7 +316,6 @@ const UserDashboard = () => {
                                   <div className="grid grid-cols-1 gap-2">
                                     {(slots.length > 0 ? slots : [
                                       { slotId: 1, startTime: '07:30:00', endTime: '09:00:00' },
-                                      // ... các slot mặc định khác
                                     ]).map((slot: any) => {
                                       const startLabel = slot.startTime.substring(0, 5);
                                       const endLabel = slot.endTime.substring(0, 5);
@@ -340,14 +350,12 @@ const UserDashboard = () => {
                                   onClick={async () => {
                                     if (!selectedRoom) return;
                                     setIsBooking(true);
-                                    // Payload sử dụng dữ liệu từ selectedRoom (đã chuẩn hóa)
                                     const payload = {
                                       bookingCode: `BK-${Date.now()}`,
                                       bookingDate: selectedDate, 
                                       purpose: purpose || 'Đặt phòng',
                                       numberOfMember: selectedRoom.capacity || 0,
                                       userId: (user as any)?.userId ?? 0,
-                                      // Lưu ý: selectedRoom.id đã convert sang string, cần parse lại nếu API cần số
                                       facilityId: Number(selectedRoom.id), 
                                       slotNumber: selectedSlotId,
                                     };
