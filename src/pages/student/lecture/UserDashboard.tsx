@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Bỏ comment nếu dùng
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Clock, MapPin, TrendingUp } from 'lucide-react';
+import { Calendar, Clock, MapPin } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -24,8 +24,20 @@ const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
   const [facilityTypes, setFacilityTypes] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
-  const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+
+  // --- SỬA ĐỔI: LOGIC NGÀY THÁNG ---
+  // 1. State lưu ngày đặt phòng (mặc định là hôm nay)
+  const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 2. Tính toán giới hạn ngày (Min: hôm nay, Max: hôm nay + 3 ngày)
+  const today = new Date();
+  const minDate = today.toISOString().split('T')[0];
+
+  const futureDate = new Date(today);
+  futureDate.setDate(today.getDate() + 3);
+  const maxDate = futureDate.toISOString().split('T')[0];
+  // ----------------------------------
 
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
@@ -38,22 +50,17 @@ const UserDashboard = () => {
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
 
   const handleCampusChange = (campus: 'campus1' | 'campus2') => {
-    // Update campus in auth context so selection persists
     updateCampus(campus);
   };
 
-  // timeSlots replaced by predefinedSlots (fixed ranges)
-
   useEffect(() => {
     const fetchFacilityTypes = async () => {
-      // Try proxy first, fallback to direct https if needed
       const proxyUrl = '/api/FacilityType';
       const directUrl = '/api/FacilityType';
 
       try {
         let res = await fetch(proxyUrl);
         if (!res.ok) {
-          // try direct
           res = await fetch(directUrl, { mode: 'cors' });
         }
 
@@ -71,7 +78,7 @@ const UserDashboard = () => {
     };
 
     fetchFacilityTypes();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     const fetchSlots = async () => {
@@ -87,7 +94,6 @@ const UserDashboard = () => {
         if (res.ok) {
           const data = await res.json();
           setSlots(Array.isArray(data) ? data : []);
-          // Set first slot as default if available
           if (Array.isArray(data) && data.length > 0) {
             setSelectedSlotId(data[0].slotId);
             setSelectedStartTime(data[0].startTime);
@@ -130,7 +136,6 @@ const UserDashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-            
           </div>
         </div>
 
@@ -181,13 +186,12 @@ const UserDashboard = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {(
                 facilityTypes.length
-                  ? facilityTypes.filter((_: any, i: number) => true) // we'll show all facility types
+                  ? facilityTypes.filter((_: any, i: number) => true)
                   : mockRooms.filter(room => room.campus === user?.campus)
               ).map((room: any, idx: number) => {
                   const gradients = ['gradient-purple', 'gradient-blue', 'gradient-pink', 'gradient-orange', 'gradient-green'];
                   const gradient = gradients[idx % gradients.length];
                   
-                  // normalize room object when facilityTypes is used
                   const roomObj = facilityTypes.length
                     ? { id: String(room.typeId ?? idx), name: room.typeName ?? `Loại ${idx+1}`, type: room.description ?? room.typeName, capacity: 0, campus: 'campus1' }
                     : room;
@@ -233,16 +237,28 @@ const UserDashboard = () => {
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
+                                
+                                {/* --- SỬA ĐỔI: INPUT DATE --- */}
                                 <div className="space-y-2">
                                   <Label htmlFor="booking-date">Chọn ngày</Label>
                                   <input 
                                     id="booking-date"
                                     type="date" 
                                     className="w-full px-3 py-2 border border-input rounded-md"
-                                    defaultValue={selectedDate}
+                                    
+                                    // Giới hạn ngày
+                                    min={minDate}
+                                    max={maxDate}
+                                    
+                                    // Binding 2 chiều
+                                    value={bookingDate}
+                                    onChange={(e) => setBookingDate(e.target.value)}
+                                    
                                     aria-label="Chọn ngày đặt phòng"
                                   />
                                 </div>
+                                {/* --------------------------- */}
+
                                 <div className="space-y-2">
                                   <Label>Chọn khung giờ: </Label>
                                   <div className="grid grid-cols-1 gap-2">
@@ -288,7 +304,10 @@ const UserDashboard = () => {
                                     setIsBooking(true);
                                     const payload = {
                                       bookingCode: `BK-${Date.now()}`,
-                                      bookingDate: selectedDate,
+                                      
+                                      // SỬA ĐỔI: Dùng state bookingDate để gửi ngày chính xác
+                                      bookingDate: bookingDate, 
+                                      
                                       purpose: purpose || 'Đặt phòng',
                                       numberOfMember: selectedRoom.capacity || 0,
                                       userId: (/* eslint-disable @typescript-eslint/no-explicit-any */ (user as any)?.userId) ?? 0,
@@ -306,8 +325,6 @@ const UserDashboard = () => {
                                       if (res.ok) {
                                         const data = await res.json();
                                         toast({ title: 'Đặt phòng thành công', description: 'Yêu cầu đặt phòng đã được gửi.' });
-                                        // Optionally add to local mock list
-                                        // add returned booking if provided
                                         if (data && data.id) {
                                           mockBookings.push(data);
                                         }
@@ -335,8 +352,6 @@ const UserDashboard = () => {
             </div>
           </CardContent>
         </Card>
-
-        
       </main>
     </div>
   );
