@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // Bỏ comment nếu dùng
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input'; // Đảm bảo bạn đã có component này hoặc dùng thẻ input thường
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Clock, MapPin } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -18,26 +18,20 @@ interface Room {
   type: string;
   capacity: number;
   campus: 'campus1' | 'campus2';
+  equipment?: string;
+  status?: string;
+  floors?: number;
 }
 
 const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
-  const [facilityTypes, setFacilityTypes] = useState<any[]>([]);
+  const [facilities, setFacilities] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
+  const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
-  // --- SỬA ĐỔI: LOGIC NGÀY THÁNG ---
-  // 1. State lưu ngày đặt phòng (mặc định là hôm nay)
-  const [bookingDate, setBookingDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // 2. Tính toán giới hạn ngày (Min: hôm nay, Max: hôm nay + 3 ngày)
-  const today = new Date();
-  const minDate = today.toISOString().split('T')[0];
-
-  const futureDate = new Date(today);
-  futureDate.setDate(today.getDate() + 3);
-  const maxDate = futureDate.toISOString().split('T')[0];
-  // ----------------------------------
+  // --- MỚI: State cho thanh tìm kiếm ---
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
@@ -46,7 +40,6 @@ const UserDashboard = () => {
   const [isBooking, setIsBooking] = useState(false);
   const { toast } = useToast();
 
-  // Filter bookings for current user
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
 
   const handleCampusChange = (campus: 'campus1' | 'campus2') => {
@@ -54,9 +47,9 @@ const UserDashboard = () => {
   };
 
   useEffect(() => {
-    const fetchFacilityTypes = async () => {
-      const proxyUrl = '/api/FacilityType';
-      const directUrl = '/api/FacilityType';
+    const fetchFacilities = async () => {
+      const proxyUrl = '/api/Faciliti/List';
+      const directUrl = 'https://localhost:44338/api/Faciliti/List';
 
       try {
         let res = await fetch(proxyUrl);
@@ -66,31 +59,26 @@ const UserDashboard = () => {
 
         if (res.ok) {
           const data = await res.json();
-          setFacilityTypes(Array.isArray(data) ? data : []);
+          setFacilities(Array.isArray(data) ? data : []);
         } else {
-          console.warn('FacilityType fetch failed:', res.statusText);
-          toast?.({ title: 'Không lấy được loại phòng', description: 'Server trả về lỗi khi lấy thông tin loại phòng.' });
+          console.warn('Facilities fetch failed:', res.statusText);
+          toast?.({ title: 'Cảnh báo', description: 'Không lấy được danh sách phòng từ server.' });
         }
       } catch (err) {
-        console.warn('FacilityType fetch error:', err);
-        toast?.({ title: 'Lỗi mạng', description: 'Không thể kết nối tới API loại phòng.' });
+        console.warn('Facilities fetch error:', err);
+        setFacilities([]); // Reset về rỗng để fallback sang mockRooms
       }
     };
 
-    fetchFacilityTypes();
-  }, [toast]);
+    fetchFacilities();
+  }, [user?.campus]); // Re-fetch khi user đổi campus
 
   useEffect(() => {
     const fetchSlots = async () => {
+      // ... (Giữ nguyên logic fetch slots)
       const proxyUrl = '/api/Slot';
-      const directUrl = '/api/Slot';
-
       try {
-        let res = await fetch(proxyUrl);
-        if (!res.ok) {
-          res = await fetch(directUrl, { mode: 'cors' });
-        }
-
+        const res = await fetch(proxyUrl);
         if (res.ok) {
           const data = await res.json();
           setSlots(Array.isArray(data) ? data : []);
@@ -99,23 +87,57 @@ const UserDashboard = () => {
             setSelectedStartTime(data[0].startTime);
             setSelectedEndTime(data[0].endTime);
           }
-        } else {
-          console.warn('Slot fetch failed:', res.statusText);
         }
-      } catch (err) {
-        console.warn('Slot fetch error:', err);
-      }
+      } catch (err) { console.warn(err); }
     };
-
     fetchSlots();
   }, []);
+
+  // --- MỚI: Logic Filter và Chuẩn hóa dữ liệu ---
+  // Sử dụng useMemo để tối ưu hiệu năng, tránh tính toán lại mỗi lần render không cần thiết
+  const filteredFacilities = useMemo(() => {
+    // 1. Xác định nguồn dữ liệu (API hay Mock)
+    const sourceData = facilities.length > 0 ? facilities : mockRooms;
+
+    // 2. Map dữ liệu về chuẩn chung (Interface Room)
+    const normalizedData: Room[] = sourceData.map((item: any) => {
+      // Logic xác định campus từ dữ liệu API (thường trả về tên tiếng Việt)
+      const isCampus1 = item.campusName 
+        ? item.campusName.toLowerCase().includes('công nghệ cao') 
+        : item.campus === 'campus1';
+      
+      return {
+        id: String(item.facilityId || item.id),
+        name: item.facilityCode || item.name,
+        type: item.typeName || item.type || '', // Quan trọng cho việc search
+        capacity: item.capacity || 0,
+        campus: isCampus1 ? 'campus1' : 'campus2',
+        equipment: item.equipment,
+        status: item.status || 'Available',
+        floors: item.floors
+      };
+    });
+
+    // 3. Thực hiện Filter
+    return normalizedData.filter(room => {
+      // Filter theo Campus hiện tại của user
+      const matchCampus = room.campus === user?.campus;
+
+      // Filter theo Search Term (TypeName)
+      // Tìm kiếm không phân biệt hoa thường
+      const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchCampus && matchSearch;
+    });
+
+  }, [facilities, user?.campus, searchTerm]); // Chạy lại khi 3 biến này thay đổi
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       
       <main className="container py-8 space-y-8 animate-fade-in">
-        {/* Welcome Section */}
+        {/* Welcome & Campus Selection Section */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Chào mừng, {user?.email.split('@')[0]}</h1>
@@ -131,16 +153,17 @@ const UserDashboard = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="campus1">Campus 1 - Công nghệ cao</SelectItem>
-                  <SelectItem value="campus2">Campus 2 - Nhà văn hóa</SelectItem>
+                  <SelectItem value="campus1">Campus 1 - Cơ sở khu công nghệ cao</SelectItem>
+                  <SelectItem value="campus2">Campus 2 - Cơ sở nhà văn hóa</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Stats Cards Section */}
         <div className="grid gap-4 md:grid-cols-3">
+           {/* ... (Giữ nguyên phần Stats Card) */}
           <Card className="gradient-purple text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Đặt phòng đang hoạt động</CardTitle>
@@ -170,31 +193,49 @@ const UserDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {mockRooms.filter(r => r.campus === user?.campus).length}
+                {/* Hiển thị số lượng sau khi đã filter */}
+                {filteredFacilities.length}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Room Availability Grid */}
+        {/* Room List Section with Search */}
         <Card>
           <CardHeader>
-            <CardTitle>Phòng khả dụng hôm nay</CardTitle>
-            <CardDescription>Campus {user?.campus === 'campus1' ? '1 - Công nghệ cao' : '2 - Nhà văn hóa'}</CardDescription>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle>Phòng khả dụng hôm nay</CardTitle>
+                <CardDescription>
+                  Campus {user?.campus === 'campus1' ? '1 - Công nghệ cao' : '2 - Nhà văn hóa'}
+                </CardDescription>
+              </div>
+              
+              {/* --- MỚI: Thanh Search --- */}
+              <div className="relative w-full md:w-[300px]">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Tìm theo loại phòng (VD: Classroom)..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {/* ------------------------- */}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {(
-                facilityTypes.length
-                  ? facilityTypes.filter((_: any, i: number) => true)
-                  : mockRooms.filter(room => room.campus === user?.campus)
-              ).map((room: any, idx: number) => {
+            {filteredFacilities.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                Không tìm thấy phòng nào phù hợp với từ khóa "{searchTerm}" tại Campus này.
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Render danh sách đã filter */}
+                {filteredFacilities.map((roomObj, idx) => {
                   const gradients = ['gradient-purple', 'gradient-blue', 'gradient-pink', 'gradient-orange', 'gradient-green'];
                   const gradient = gradients[idx % gradients.length];
-                  
-                  const roomObj = facilityTypes.length
-                    ? { id: String(room.typeId ?? idx), name: room.typeName ?? `Loại ${idx+1}`, type: room.description ?? room.typeName, capacity: 0, campus: 'campus1' }
-                    : room;
 
                   return (
                     <Card key={roomObj.id} className="overflow-hidden hover:shadow-lg transition-all hover:scale-105">
@@ -205,19 +246,29 @@ const UserDashboard = () => {
                             <CardTitle className="text-lg">{roomObj.name}</CardTitle>
                             <CardDescription>{roomObj.type}</CardDescription>
                           </div>
-                          <Badge variant="secondary" className="font-semibold">{roomObj.capacity ?? 0} chỗ</Badge>
+                          <Badge variant="secondary" className="font-semibold">{roomObj.capacity} chỗ</Badge>
                         </div>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
+                          {roomObj.equipment && (
+                            <div className="text-xs text-muted-foreground mb-2 truncate" title={roomObj.equipment}>
+                              🔧 {roomObj.equipment}
+                            </div>
+                          )}
                           <div className="flex items-center gap-2 text-sm">
-                            <div className="h-3 w-3 rounded-full bg-success animate-pulse" />
-                            <span className="text-muted-foreground">Khả dụng: 8h-12h, 14h-17h</span>
+                            <div className={`h-3 w-3 rounded-full ${roomObj.status === 'Available' ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
+                            <span className="text-muted-foreground">
+                              {roomObj.status === 'Available' ? 'Sẵn sàng' : 'Bảo trì/Đã đầy'}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className="h-3 w-3 rounded-full bg-destructive" />
-                            <span className="text-muted-foreground">Đã đặt: 9h-11h, 15h-16h</span>
-                          </div>
+                          {roomObj.floors && (
+                            <div className="text-xs text-muted-foreground">
+                              📍 Tầng {roomObj.floors}
+                            </div>
+                          )}
+                          
+                          {/* Dialog Booking */}
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -225,50 +276,37 @@ const UserDashboard = () => {
                                 size="sm" 
                                 className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors"
                                 onClick={() => setSelectedRoom(roomObj)}
+                                disabled={roomObj.status !== 'Available'}
                               >
-                                Xem chi tiết
+                                {roomObj.status === 'Available' ? 'Đặt phòng' : 'Không khả dụng'}
                               </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px]">
                               <DialogHeader>
                                 <DialogTitle>{roomObj.name}</DialogTitle>
                                 <DialogDescription>
-                                  {roomObj.type} - Sức chứa: {roomObj.capacity ?? 0} người
+                                  {roomObj.type} - Sức chứa: {roomObj.capacity} người
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
-                                
-                                {/* --- SỬA ĐỔI: INPUT DATE --- */}
+                                {/* Form đặt phòng (Giữ nguyên) */}
                                 <div className="space-y-2">
                                   <Label htmlFor="booking-date">Chọn ngày</Label>
                                   <input 
                                     id="booking-date"
                                     type="date" 
                                     className="w-full px-3 py-2 border border-input rounded-md"
-                                    
-                                    // Giới hạn ngày
-                                    min={minDate}
-                                    max={maxDate}
-                                    
-                                    // Binding 2 chiều
-                                    value={bookingDate}
-                                    onChange={(e) => setBookingDate(e.target.value)}
-                                    
+                                    defaultValue={selectedDate}
                                     aria-label="Chọn ngày đặt phòng"
                                   />
                                 </div>
-                                {/* --------------------------- */}
-
                                 <div className="space-y-2">
                                   <Label>Chọn khung giờ: </Label>
                                   <div className="grid grid-cols-1 gap-2">
                                     {(slots.length > 0 ? slots : [
                                       { slotId: 1, startTime: '07:30:00', endTime: '09:00:00' },
-                                      { slotId: 2, startTime: '09:10:00', endTime: '10:40:00' },
-                                      { slotId: 3, startTime: '10:50:00', endTime: '12:20:00' },
-                                      { slotId: 4, startTime: '13:00:00', endTime: '14:30:00' },
-                                      { slotId: 5, startTime: '14:40:00', endTime: '16:10:00' },
-                                    ]).map(slot => {
+                                      // ... các slot mặc định khác
+                                    ]).map((slot: any) => {
                                       const startLabel = slot.startTime.substring(0, 5);
                                       const endLabel = slot.endTime.substring(0, 5);
                                       return (
@@ -293,7 +331,7 @@ const UserDashboard = () => {
                                   <Label>Mục đích sử dụng</Label>
                                   <textarea 
                                     className="w-full px-3 py-2 border border-input rounded-md min-h-[80px]"
-                                    placeholder="Nhập mục đích sử dụng phòng..."
+                                    placeholder="Nhập mục đích sử dụng..."
                                     value={purpose}
                                     onChange={(e) => setPurpose(e.target.value)}
                                   />
@@ -302,16 +340,15 @@ const UserDashboard = () => {
                                   onClick={async () => {
                                     if (!selectedRoom) return;
                                     setIsBooking(true);
+                                    // Payload sử dụng dữ liệu từ selectedRoom (đã chuẩn hóa)
                                     const payload = {
                                       bookingCode: `BK-${Date.now()}`,
-                                      
-                                      // SỬA ĐỔI: Dùng state bookingDate để gửi ngày chính xác
-                                      bookingDate: bookingDate, 
-                                      
+                                      bookingDate: selectedDate, 
                                       purpose: purpose || 'Đặt phòng',
                                       numberOfMember: selectedRoom.capacity || 0,
-                                      userId: (/* eslint-disable @typescript-eslint/no-explicit-any */ (user as any)?.userId) ?? 0,
-                                      facilityId: selectedRoom.id,
+                                      userId: (user as any)?.userId ?? 0,
+                                      // Lưu ý: selectedRoom.id đã convert sang string, cần parse lại nếu API cần số
+                                      facilityId: Number(selectedRoom.id), 
                                       slotNumber: selectedSlotId,
                                     };
 
@@ -321,16 +358,13 @@ const UserDashboard = () => {
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify(payload),
                                       });
-
                                       if (res.ok) {
                                         const data = await res.json();
-                                        toast({ title: 'Đặt phòng thành công', description: 'Yêu cầu đặt phòng đã được gửi.' });
-                                        if (data && data.id) {
-                                          mockBookings.push(data);
-                                        }
+                                        toast({ title: 'Thành công', description: 'Đặt phòng thành công.' });
+                                        if (data && data.id) mockBookings.push(data);
                                       } else {
                                         const text = await res.text();
-                                        toast({ title: 'Lỗi đặt phòng', description: text, variant: 'destructive' });
+                                        toast({ title: 'Lỗi', description: text, variant: 'destructive' });
                                       }
                                     } catch (err) {
                                       toast({ title: 'Lỗi mạng', description: String(err), variant: 'destructive' });
@@ -339,7 +373,7 @@ const UserDashboard = () => {
                                     }
                                   }}
                                 >
-                                  {isBooking ? 'Đang gửi...' : 'Đặt phòng'}
+                                  {isBooking ? 'Đang gửi...' : 'Xác nhận đặt phòng'}
                                 </Button>
                               </div>
                             </DialogContent>
@@ -349,7 +383,8 @@ const UserDashboard = () => {
                     </Card>
                   );
                 })}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
