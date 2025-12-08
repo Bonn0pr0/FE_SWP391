@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Building2, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
+import logo from '@/pictures/logo.png';
 
 export const Header = () => {
   const { isAuthenticated, logout, user } = useAuth();
@@ -16,8 +17,8 @@ export const Header = () => {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">FPTU Booking</span>
+          <img src={logo} alt="FPTU Logo" className="h-16 w-36 object-contain" />
+          <span className="text-xl font-bold"></span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-10">
