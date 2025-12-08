@@ -50,7 +50,8 @@ const Login = () => {
 
       // LOGIC ĐIỀU HƯỚNG
       if (roleId === 1) {
-        navigate('/admin');
+        // Nếu là Admin, điều hướng trực tiếp đến trang Lịch sử booking
+        navigate('/admin?section=booking-history');
       } else if (roleId === 2 || roleId === 3) {
         navigate('/');
       } else {

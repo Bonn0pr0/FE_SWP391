@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { AdminSidebar, type AdminSection } from '@/pages/admin/AdminSidebar';
 import { AdminDashboardStats } from '@/pages/admin/AdminDashboardStats';
@@ -10,7 +11,20 @@ import { AdminRoomManagement } from '@/pages/admin/AdminRoomManagement';
 import Users from '@/pages/admin/Users';
 
 const AdminDashboard = () => {
-  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const location = useLocation();
+
+  const getInitialSection = (): AdminSection => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const s = params.get('section');
+      const validSections: AdminSection[] = ['dashboard', 'overview', 'booking-history', 'reports', 'room-types', 'room-management', 'users'];
+      return s && validSections.includes(s as AdminSection) ? (s as AdminSection) : 'dashboard';
+    } catch (e) {
+      return 'dashboard';
+    }
+  };
+
+  const [activeSection, setActiveSection] = useState<AdminSection>(getInitialSection());
 
   const renderSection = () => {
     switch (activeSection) {
