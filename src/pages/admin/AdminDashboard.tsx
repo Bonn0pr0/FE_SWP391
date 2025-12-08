@@ -5,6 +5,7 @@ import { AdminSidebar, type AdminSection } from '@/pages/admin/AdminSidebar';
 import { AdminDashboardStats } from '@/pages/admin/AdminDashboardStats';
 import { AdminOverview } from '@/pages/admin/AdminOverview';
 import { AdminBookingHistory } from '@/pages/admin/AdminBookingHistory';
+import { AdminFeedbackManagement } from '@/pages/admin/AdminFeedbackManagement';
 import { AdminReports } from '@/pages/admin/AdminReports';
 import { AdminRoomTypes } from '@/pages/admin/AdminRoomTypes';
 import { AdminRoomManagement } from '@/pages/admin/AdminRoomManagement';
@@ -34,6 +35,8 @@ const AdminDashboard = () => {
         return <AdminOverview />;
       case 'booking-history':
         return <AdminBookingHistory />;
+      case 'feedback-management':
+        return <AdminFeedbackManagement />;
       case 'reports':
         return <AdminReports />;
       case 'room-types':

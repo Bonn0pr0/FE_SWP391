@@ -42,19 +42,6 @@ import { toast } from '@/hooks/use-toast';
 
 // --- 1. ĐỊNH NGHĨA TYPE ---
 
-// Type cho dữ liệu trả về từ API Backend (.NET)
-interface ApiFacility {
-  facilityId: number;
-  facilityCode: string;
-  capacity: number;
-  floors: number;
-  equipment: string | null;
-  status: string;
-  campusName: string;
-  typeName: string;
-}
-
-// Interface mới cho Campus (Dựa trên curl bạn cung cấp)
 interface ApiCampus {
   campusId: number;
   campusName: string;
@@ -62,14 +49,12 @@ interface ApiCampus {
   status?: string;
 }
 
-// Interface mới cho FacilityType (Dựa trên curl bạn cung cấp)
 interface ApiFacilityType {
   typeId: number;
   typeName: string;
   description?: string;
 }
 
-// Type cho dữ liệu dùng trong React Component (UI)
 interface ManagedRoom {
   id: string; 
   name: string; 
@@ -93,12 +78,33 @@ const statusOptions = [
 
 const emptyRoom: Omit<ManagedRoom, 'id'> = {
   name: '',
-  type: '', // Để rỗng để buộc người dùng chọn
-  campus: '', // Để rỗng để buộc người dùng chọn
+  type: '', 
+  campus: '', 
   capacity: 30,
   floor: 1,
   equipment: [],
   status: 'Available',
+};
+
+// --- HÀM HELPER: TÌM TẦNG AN TOÀN ---
+// Hàm này sẽ quét tất cả các key trong object trả về để tìm key nào là "floor" (bất chấp hoa thường)
+const getSafeFloorValue = (item: any): number => {
+  if (!item) return 0;
+  
+  // 1. Kiểm tra trực tiếp các trường phổ biến
+  if (item.floor !== undefined && item.floor !== null) return Number(item.floor);
+  if (item.Floor !== undefined && item.Floor !== null) return Number(item.Floor);
+  if (item.FloorNumber !== undefined && item.FloorNumber !== null) return Number(item.FloorNumber);
+
+  // 2. Quét toàn bộ key để tìm "floor" (case-insensitive)
+  const keys = Object.keys(item);
+  const floorKey = keys.find(k => k.toLowerCase().includes('floor')); // Tìm key có chứa chữ 'floor'
+  
+  if (floorKey && item[floorKey] !== null && item[floorKey] !== undefined) {
+    return Number(item[floorKey]);
+  }
+
+  return 0; // Mặc định nếu không tìm thấy gì
 };
 
 export const AdminRoomManagement = () => {
@@ -106,67 +112,59 @@ export const AdminRoomManagement = () => {
   const [loading, setLoading] = useState(false); 
   const [searchQuery, setSearchQuery] = useState('');
   
-  // --- STATE CHO DỮ LIỆU ĐỘNG TỪ DB ---
   const [campusList, setCampusList] = useState<ApiCampus[]>([]);
   const [typeList, setTypeList] = useState<ApiFacilityType[]>([]);
 
-  // State quản lý Dialog
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<ManagedRoom | null>(null);
   const [roomToDelete, setRoomToDelete] = useState<ManagedRoom | null>(null);
   
-  // State Form
   const [formData, setFormData] = useState<Omit<ManagedRoom, 'id'>>(emptyRoom);
   const [equipmentInput, setEquipmentInput] = useState('');
 
   // --- 2. CÁC HÀM GỌI API ---
 
-  // Hàm load dữ liệu danh mục (Campus, Type)
   const fetchMetadata = async () => {
     try {
-      // 1. Fetch Campus API
       const campusRes = await fetch(`${API_BASE_URL}/Campus`);
-      if (campusRes.ok) {
-        const campusData: ApiCampus[] = await campusRes.json();
-        setCampusList(campusData);
-      } else {
-        console.error("Failed to fetch campuses");
-      }
+      if (campusRes.ok) setCampusList(await campusRes.json());
 
-      // 2. Fetch FacilityType API
       const typeRes = await fetch(`${API_BASE_URL}/FacilityType`);
-      if (typeRes.ok) {
-        const typeData: ApiFacilityType[] = await typeRes.json();
-        setTypeList(typeData);
-      } else {
-        console.error("Failed to fetch facility types");
-      }
-
+      if (typeRes.ok) setTypeList(await typeRes.json());
     } catch (error) {
       console.error("Lỗi khi tải danh mục:", error);
     }
   };
 
-  // Hàm load dữ liệu phòng chính
   const fetchRooms = async () => {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/Faciliti/List`);
       
       if (!response.ok) throw new Error('Không thể tải dữ liệu');
-      const data: ApiFacility[] = await response.json();
+      const data: any[] = await response.json(); // Dùng any[] để linh hoạt
 
-      const mappedData: ManagedRoom[] = data.map((item) => ({
-        id: item.facilityId.toString(),
-        name: item.facilityCode || 'Chưa đặt tên',
-        type: item.typeName || '',
-        campus: item.campusName || '',
-        capacity: item.capacity,
-        floor: item.floors,
-        equipment: item.equipment ? item.equipment.split(',').map(e => e.trim()) : [],
-        status: item.status || 'Available',
-      }));
+      console.log("=== API DATA ===", data); // Check log F12 để xem tên biến thật sự
+
+      const mappedData: ManagedRoom[] = data.map((item) => {
+        // Dùng hàm helper để lấy tầng chính xác nhất
+        const floorVal = getSafeFloorValue(item);
+
+        return {
+            id: item.facilityId?.toString() || item.FacilityId?.toString() || "",
+            name: item.facilityCode || item.FacilityCode || 'Chưa đặt tên',
+            type: item.typeName || item.TypeName || '',
+            campus: item.campusName || item.CampusName || '',
+            capacity: Number(item.capacity || item.Capacity || 0),
+            
+            // Gán giá trị tầng đã xử lý
+            floor: isNaN(floorVal) ? 0 : floorVal,
+            
+            equipment: (item.equipment || item.Equipment || "").split(',').map((e: string) => e.trim()).filter((e:string) => e),
+            status: item.status || item.Status || 'Available',
+        };
+      });
 
       setRooms(mappedData);
     } catch (error) {
@@ -177,13 +175,11 @@ export const AdminRoomManagement = () => {
     }
   };
 
-  // Gọi API khi component được mount
   useEffect(() => {
     fetchRooms();
-    fetchMetadata(); // Gọi thêm hàm lấy Campus và Type
+    fetchMetadata();
   }, []);
 
-  // Filter local
   const filteredRooms = rooms.filter((room) => {
     return room.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -212,13 +208,10 @@ export const AdminRoomManagement = () => {
 
   // --- 3. XỬ LÝ LƯU (CREATE / UPDATE) ---
   const handleSave = async () => {
-    const equipmentString = equipmentInput;
-
     if (!formData.name.trim()) {
       toast({ title: 'Lỗi', description: 'Vui lòng nhập mã/tên phòng', variant: 'destructive' });
       return;
     }
-    // Validation cơ bản
     if (!formData.type) {
         toast({ title: 'Lỗi', description: 'Vui lòng chọn loại phòng', variant: 'destructive' });
         return;
@@ -228,18 +221,19 @@ export const AdminRoomManagement = () => {
         return;
     }
 
-    // Payload gửi đi
-    // Lưu ý: Backend API create/update của bạn đang nhận `typeName` và `campusName` (String).
-    // Nên ta gửi trực tiếp tên (value của Select box).
+    // --- PAYLOAD CHUẨN PASCAL CASE CHO .NET ---
     const payload = {
-      facilityCode: formData.name,
-      capacity: formData.capacity,
-      floors: formData.floor,
-      equipment: equipmentString,
-      status: formData.status,
-      campusName: formData.campus, 
-      typeName: formData.type        
+      FacilityId: editingRoom ? parseInt(editingRoom.id) : 0,
+      FacilityCode: formData.name, // PascalCase
+      Capacity: formData.capacity, // PascalCase
+      Floor: formData.floor,       // PascalCase
+      Equipment: equipmentInput,   // PascalCase
+      Status: formData.status,     // PascalCase
+      CampusName: formData.campus, 
+      TypeName: formData.type        
     };
+    
+    console.log("Payload gửi đi:", payload);
 
     try {
       if (editingRoom) {
@@ -250,7 +244,12 @@ export const AdminRoomManagement = () => {
           body: JSON.stringify(payload),
         });
 
-        if (!res.ok) throw new Error('Cập nhật thất bại');
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Lỗi update từ server:", errorText);
+            throw new Error(`Cập nhật thất bại: ${res.status}`);
+        }
+        
         toast({ title: 'Thành công', description: 'Đã cập nhật thông tin phòng' });
       } else {
         // --- API CREATE ---
@@ -279,7 +278,6 @@ export const AdminRoomManagement = () => {
         const res = await fetch(`${API_BASE_URL}/Faciliti/${roomToDelete.id}`, {
           method: 'DELETE',
         });
-
         if (!res.ok) throw new Error('Xóa thất bại');
         
         toast({ title: 'Thành công', description: 'Đã xóa phòng' });
@@ -298,10 +296,8 @@ export const AdminRoomManagement = () => {
     const normalizedStatus = statusOptions.find(
       (s) => s.value.toLowerCase() === status.toLowerCase()
     );
-    
     const color = normalizedStatus ? normalizedStatus.color : 'bg-gray-500';
     const label = normalizedStatus ? normalizedStatus.label : status;
-
     return (
       <Badge variant="outline" className="gap-1">
         <span className={`w-2 h-2 rounded-full ${color}`} />
@@ -367,7 +363,9 @@ export const AdminRoomManagement = () => {
                     <TableCell className="font-medium">{room.name}</TableCell>
                     <TableCell>{room.type}</TableCell>
                     <TableCell>{room.campus}</TableCell>
-                    <TableCell>{room.floor === 0 ? 'Tầng trệt' : `Tầng ${room.floor}`}</TableCell>
+                    <TableCell>
+                        {room.floor === 0 ? 'Tầng trệt' : `Tầng ${room.floor}`}
+                    </TableCell>
                     <TableCell>{room.capacity}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -420,7 +418,6 @@ export const AdminRoomManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog Thêm/Sửa */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -440,7 +437,6 @@ export const AdminRoomManagement = () => {
                 placeholder="VD: P.A101"
               />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Loại phòng</Label>
@@ -448,49 +444,25 @@ export const AdminRoomManagement = () => {
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn loại" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Chọn loại" /></SelectTrigger>
                   <SelectContent>
-                    {/* Render dữ liệu từ API Type */}
-                    {typeList.length > 0 ? (
-                      typeList.map((t) => (
-                        <SelectItem key={t.typeId} value={t.typeName}>
-                          {t.typeName}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-muted-foreground">Đang tải danh sách...</div>
-                    )}
+                    {typeList.map((t) => <SelectItem key={t.typeId} value={t.typeName}>{t.typeName}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Campus</Label>
                 <Select
                   value={formData.campus}
                   onValueChange={(value) => setFormData({ ...formData, campus: value })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn cơ sở" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Chọn cơ sở" /></SelectTrigger>
                   <SelectContent>
-                     {/* Render dữ liệu từ API Campus */}
-                     {campusList.length > 0 ? (
-                      campusList.map((c) => (
-                        <SelectItem key={c.campusId} value={c.campusName}>
-                          {c.campusName}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-muted-foreground">Đang tải danh sách...</div>
-                    )}
+                      {campusList.map((c) => <SelectItem key={c.campusId} value={c.campusName}>{c.campusName}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="floor">Tầng</Label>
@@ -513,29 +485,22 @@ export const AdminRoomManagement = () => {
                 />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label>Trạng thái</Label>
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {statusOptions.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${status.color}`} />
-                        {status.label}
-                      </div>
+                      <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${status.color}`} />{status.label}</div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="equipment">Thiết bị (phân cách bằng dấu phẩy)</Label>
               <Input
@@ -546,29 +511,21 @@ export const AdminRoomManagement = () => {
               />
             </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave}>
-              {editingRoom ? 'Cập nhật' : 'Thêm phòng'}
-            </Button>
+            <Button onClick={handleSave}>{editingRoom ? 'Cập nhật' : 'Thêm phòng'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Xác nhận xóa phòng</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa phòng "{roomToDelete?.name}"? Hành động này không thể hoàn tác.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Bạn có chắc chắn muốn xóa phòng "{roomToDelete?.name}"? Hành động này không thể hoàn tác.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Xóa
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
