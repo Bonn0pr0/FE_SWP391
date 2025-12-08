@@ -27,7 +27,19 @@ const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
   const [facilities, setFacilities] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
-  const [selectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // --- THAY ĐỔI 1: Thêm hàm setSelectedDate để cập nhật state ---
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // --- THAY ĐỔI 2: Tính toán ngày Min và Max ---
+  const today = new Date();
+  const minDate = today.toISOString().split('T')[0]; // Ngày hiện tại
+
+  const maxDateObj = new Date(today);
+  maxDateObj.setDate(today.getDate() + 3); // Cộng thêm 3 ngày
+  const maxDate = maxDateObj.toISOString().split('T')[0];
+  // -------------------------------------------------------------
+
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -40,10 +52,7 @@ const UserDashboard = () => {
 
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
 
-  // --- CẬP NHẬT 1: Cho phép tham số là 'all' ---
   const handleCampusChange = (campus: 'campus1' | 'campus2' | 'all') => {
-    // Ép kiểu về any để bypass check type nghiêm ngặt của updateCampus (nếu context của bạn chưa hỗ trợ 'all')
-    // Nếu context đã hỗ trợ thì bỏ "as any"
     updateCampus(campus as any);
   };
 
@@ -112,12 +121,8 @@ const UserDashboard = () => {
     });
 
     return normalizedData.filter(room => {
-      // --- CẬP NHẬT 2: Logic lọc mới cho 'all' ---
-      // Nếu user.campus là 'all' thì luôn trả về true (không lọc theo campus)
-      // Ngược lại thì so sánh như cũ
-      const currentCampus = (user as any)?.campus; // Dùng as any để tránh lỗi type nếu interface User chưa có 'all'
+      const currentCampus = (user as any)?.campus; 
       const matchCampus = currentCampus === 'all' || room.campus === currentCampus;
-
       const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase());
 
       return matchCampus && matchSearch;
@@ -125,7 +130,6 @@ const UserDashboard = () => {
 
   }, [facilities, user?.campus, searchTerm]);
 
-  // Helper để hiển thị tên Campus đang chọn
   const getCampusLabel = () => {
     const c = (user as any)?.campus;
     if (c === 'all') return 'Tất cả cơ sở';
@@ -148,7 +152,6 @@ const UserDashboard = () => {
           <div className="flex items-center gap-4">
             <div className="space-y-2">
               <Label htmlFor="campus" className="text-sm">Chọn Campus</Label>
-              {/* --- CẬP NHẬT 3: Thêm option 'all' vào Select --- */}
               <Select 
                 value={(user as any)?.campus || 'campus1'} 
                 onValueChange={(value: 'campus1' | 'campus2' | 'all') => handleCampusChange(value)}
@@ -210,7 +213,6 @@ const UserDashboard = () => {
               <div>
                 <CardTitle>Phòng khả dụng hôm nay</CardTitle>
                 <CardDescription>
-                  {/* Hiển thị tên campus động */}
                   {getCampusLabel()}
                 </CardDescription>
               </div>
@@ -253,7 +255,6 @@ const UserDashboard = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {/* Hiển thị thêm badge Campus nếu đang chọn xem tất cả */}
                           {(user as any)?.campus === 'all' && (
                             <Badge variant="outline" className="mb-2 mr-2">
                               {roomObj.campus === 'campus1' ? 'Khu CNC' : 'Nhà VH'}
@@ -301,16 +302,28 @@ const UserDashboard = () => {
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
+                                
+                                {/* --- THAY ĐỔI 3: Cập nhật thẻ Input Date --- */}
                                 <div className="space-y-2">
                                   <Label htmlFor="booking-date">Chọn ngày</Label>
                                   <input 
                                     id="booking-date"
                                     type="date" 
                                     className="w-full px-3 py-2 border border-input rounded-md"
-                                    defaultValue={selectedDate}
+                                    
+                                    // Set Min & Max
+                                    min={minDate}
+                                    max={maxDate}
+                                    
+                                    // Binding State và OnChange
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    
                                     aria-label="Chọn ngày đặt phòng"
                                   />
                                 </div>
+                                {/* ------------------------------------------- */}
+
                                 <div className="space-y-2">
                                   <Label>Chọn khung giờ: </Label>
                                   <div className="grid grid-cols-1 gap-2">
