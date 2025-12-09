@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { AdminSidebar, type AdminSection } from '@/pages/admin/AdminSidebar';
-import { AdminDashboardStats } from '@/pages/admin/AdminDashboardStats';
+// import { AdminDashboardStats } from '@/pages/admin/AdminDashboardStats';
 import { AdminOverview } from '@/pages/admin/AdminOverview';
 import { AdminBookingHistory } from '@/pages/admin/AdminBookingHistory';
 import { AdminFeedbackManagement } from '@/pages/admin/AdminFeedbackManagement';
@@ -29,8 +29,8 @@ const AdminDashboard = () => {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'dashboard':
-        return <AdminDashboardStats />;
+      // case 'dashboard':
+      //   return <AdminDashboardStats />;
       case 'overview':
         return <AdminOverview />;
       case 'booking-history':
@@ -46,7 +46,7 @@ const AdminDashboard = () => {
       case 'users':
         return <Users />;
       default:
-        return <AdminDashboardStats />;
+        return <AdminBookingHistory />;
     }
   };
 
