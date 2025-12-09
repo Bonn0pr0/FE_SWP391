@@ -171,7 +171,7 @@ const UserDashboard = () => {
 
         {/* Stats Cards Section */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="gradient-purple text-white border-0">
+          {/* <Card className="gradient-purple text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Đặt phòng đang hoạt động</CardTitle>
               <Calendar className="h-4 w-4 opacity-80" />
@@ -191,7 +191,7 @@ const UserDashboard = () => {
                 {userBookings.reduce((acc, b) => acc + (b.endTime - b.startTime), 0)} giờ
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           <Card className="gradient-pink text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
