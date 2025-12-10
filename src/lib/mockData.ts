@@ -5,7 +5,7 @@ export interface Room {
   campus: 'campus1' | 'campus2';
   capacity: number;
   availability: {
-    [key: string]: boolean[]; // date -> array of 24 hours (true = available)
+    [key: string]: boolean[]; 
   };
 }
 

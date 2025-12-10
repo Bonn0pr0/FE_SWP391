@@ -60,6 +60,8 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
   const [detailData, setDetailData] = useState<any>(null);
   const [detailSlotsData, setDetailSlotsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [numberOfMember, setNumberOfMember] = useState<number>(room.capacity || 0);
+  const [unavailableSlotIds, setUnavailableSlotIds] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchRoomDetail = async () => {
@@ -82,12 +84,48 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
     fetchRoomDetail();
   }, [room.id]);
 
+  // Fetch bookings for selected date + facility and mark slots that are already Approved
+  useEffect(() => {
+    const fetchBookingsAndMark = async () => {
+      try {
+        const res = await fetch('/api/Booking/List');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const facilityCode = detailData?.facilityCode || room.name;
+        if (!facilityCode) return setUnavailableSlotIds([]);
+
+        const approved = Array.isArray(data)
+          ? data.filter((b: any) =>
+              b.bookingDate === selectedDate &&
+              b.status && String(b.status).toLowerCase() === 'approved' &&
+              (b.facilityCode === facilityCode || b.facilityCode === String(facilityCode))
+            )
+          : [];
+
+        const ids: number[] = [];
+        approved.forEach((b: any) => {
+          const matched = (slots || []).find((s: any) => s.startTime === b.startTime);
+          if (matched && !ids.includes(matched.slotId)) ids.push(matched.slotId);
+        });
+
+        setUnavailableSlotIds(ids);
+      } catch (err) {
+        console.warn('Error fetching bookings for disabled slots:', err);
+        setUnavailableSlotIds([]);
+      }
+    };
+
+    // Only fetch after detailData is loaded
+    if (detailData) fetchBookingsAndMark();
+    else setUnavailableSlotIds([]);
+  }, [selectedDate, detailData, slots, room.name]);
+
   const handleBooking = async () => {
     const payload = {
-      bookingCode: `BK-${Date.now()}`,
       bookingDate: selectedDate,
-      purpose: purpose || 'Đặt phòng',
-      numberOfMember: room.capacity || 0,
+      purpose: purpose || '',
+      numberOfMember: numberOfMember,
       userId: (user as any)?.userId ?? 0,
       facilityId: Number(room.id),
       slotNumber: selectedSlotId,
@@ -135,24 +173,43 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="numberOfMember">Số lượng người tham gia</Label>
+            <input
+              id="numberOfMember"
+              type="number"
+              min="1"
+              max={room.capacity}
+              className="w-full px-3 py-2 border border-input rounded-md"
+              value={numberOfMember}
+              onChange={(e) => setNumberOfMember(parseInt(e.target.value) || 0)}
+              aria-label="Số lượng người tham gia"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label>Chọn khung giờ:</Label>
             <div className="grid grid-cols-1 gap-2">
               {(slots && slots.length > 0 ? slots : [{ slotId: 1, startTime: '07:30:00', endTime: '09:00:00' }]).map((slot: any) => {
                 const startLabel = slot.startTime.substring(0, 5);
                 const endLabel = slot.endTime.substring(0, 5);
+                const isUnavailable = unavailableSlotIds.includes(slot.slotId);
                 return (
                   <Button
                     key={slot.slotId}
                     className="w-full"
                     variant={selectedSlotId === slot.slotId ? 'default' : 'outline'}
                     size="sm"
+                    disabled={isBooking || isUnavailable}
                     onClick={() => {
+                      if (isUnavailable) return;
                       setSelectedSlotId(slot.slotId);
                       setSelectedStartTime(slot.startTime);
                       setSelectedEndTime(slot.endTime);
                     }}
+                    title={isUnavailable ? 'Đã có đặt thành công cho khung giờ này' : ''}
                   >
                     Slot {slot.slotNumber || slot.slotId}: {startLabel} - {endLabel}
+                    {/* {isUnavailable && <span className="ml-2 text-xs text-destructive"> (Có người xử dụng)</span>} */}
                   </Button>
                 );
               })}
@@ -237,7 +294,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
 
           {detailSlotsData && detailSlotsData.length > 0 ? (
             <div>
-              <p className="text-sm font-semibold mb-2">Danh sách ca có thể đặt</p>
+              <p className="text-sm font-semibold mb-2">Danh sách các slot</p>
               <div className="space-y-2">
                 {detailSlotsData.map((slot: any) => {
                   const startLabel = slot.startTime.substring(0, 5);

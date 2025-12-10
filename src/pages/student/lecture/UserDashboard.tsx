@@ -38,7 +38,7 @@ const UserDashboard = () => {
   const minDate = today.toISOString().split('T')[0]; // Ngày hiện tại
 
   const maxDateObj = new Date(today);
-  maxDateObj.setDate(today.getDate() ); // Cộng thêm 3 ngày
+  maxDateObj.setDate(today.getDate() + 31 ); // Cộng thêm 3 ngày
   const maxDate = maxDateObj.toISOString().split('T')[0];
   // -------------------------------------------------------------
 
@@ -63,7 +63,7 @@ const UserDashboard = () => {
   useEffect(() => {
     const fetchFacilities = async () => {
       const proxyUrl = '/api/Faciliti/List';
-      const directUrl = 'https://localhost:44338/api/Faciliti/List';
+      const directUrl = '/api/Faciliti/List';
 
       try {
         let res = await fetch(proxyUrl);

@@ -29,71 +29,21 @@ const Information = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [active, setActive] = useState<'history' | 'report'>('history');
-  const [bookings, setBookings] = useState<Array<Booking>>(Array.isArray(mockBookings) ? mockBookings : []);
+  const [bookings, setBookings] = useState<any[]>([]);
   const userBookings = bookings;
 
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<any>(null);
   const [reviewDesc, setReviewDesc] = useState('');
   const [reviewRating, setReviewRating] = useState<number>(5);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [bookingDetail, setBookingDetail] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [stats, setStats] = useState<any>({
     totalBookings: 0,
     successRate: 0,
     mostBookedFacilityType: 'N/A',
   });
-  const [slots, setSlots] = useState<any[]>([]);
-  const [facilitiesMap, setFacilitiesMap] = useState<Record<string, number>>({});
-
-  // Fetch user bookings from API
-  useEffect(() => {
-    const fetchSlots = async () => {
-      try {
-        const proxyUrl = '/api/Slot';
-        const directUrl = '/api/Slot';
-        let res = await fetch(proxyUrl);
-        if (!res.ok) res = await fetch(directUrl, { mode: 'cors' });
-        if (res.ok) {
-          const data = await res.json();
-          setSlots(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.warn('Error fetching slots:', err);
-      }
-    };
-
-    fetchSlots();
-  }, []);
-
-  // fetch facilities list to map facilityCode -> facilityId
-  useEffect(() => {
-    const fetchFacilities = async () => {
-      const candidates = ['/api/Facility', '/api/Facility/All', '/api/FacilityType'];
-      for (const url of candidates) {
-        try {
-          const res = await fetch(url);
-          if (!res.ok) continue;
-          const data = await res.json();
-          if (!Array.isArray(data)) continue;
-
-          const map: Record<string, number> = {};
-          data.forEach((f: any) => {
-            const id = f.facilityId ?? f.id ?? f.typeId ?? null;
-            const code = f.facilityCode ?? f.code ?? f.typeName ?? f.type ?? f.name ?? null;
-            if (id != null && code) map[String(code)] = Number(id);
-          });
-
-          if (Object.keys(map).length) {
-            setFacilitiesMap(map);
-            return;
-          }
-        } catch (err) {
-          // try next
-        }
-      }
-    };
-
-    fetchFacilities();
-  }, []);
 
   useEffect(() => {
     const fetchUserBookings = async () => {
@@ -105,22 +55,6 @@ const Information = () => {
           const data = await res.json();
           if (Array.isArray(data)) {
             const mapped = data.map((b: any) => {
-              // slot id may be under several fields; coerce to number for comparison
-              const slotIdRaw = b.slotId ?? b.slotNumber ?? b.slot?.slotId ?? b.slot?.slotNumber ?? null;
-              const slotIdNum = slotIdRaw != null ? Number(slotIdRaw) : null;
-
-              // prefer explicit time fields on booking, then nested slot, then global slots list
-              let startRaw = b.alertTime ?? b.startime ?? b.start ?? b.slot?.startime ?? '';
-              let endRaw = b.endtime ?? b.end ?? b.slot?.endtime ?? '';
-
-              if ((!startRaw || !endRaw) && slotIdNum != null && slots.length) {
-                const found = slots.find((s: any) => Number(s.slotId) === slotIdNum || Number(s.slotNumber) === slotIdNum);
-                if (found) {
-                  startRaw = startRaw || (found.startTime ?? found.start ?? '');
-                  endRaw = endRaw || (found.endTime ?? found.end ?? '');
-                }
-              }
-
               // normalize time string to HH:MM if possible
               const normalizeTime = (t: any) => {
                 if (!t) return '';
@@ -144,24 +78,26 @@ const Information = () => {
                 return '';
               };
 
-              const start = normalizeTime(startRaw);
-              const end = normalizeTime(endRaw);
+              // API response has: startime, endtime (not startTime, endTime)
+              const start = normalizeTime(b.startime ?? '');
+              const end = normalizeTime(b.endtime ?? '');
 
-              // normalize status to match UI labels (Approved, Pending, Rejected, Cancelled)
-              const apiStatus = String(b.status ?? b.bookingStatus ?? '').toLowerCase();
+              // normalize status to match UI labels (Approved, Pending, Rejected, Cancelled, Conflict)
+              const apiStatus = String(b.status ?? '').toLowerCase();
               let statusNorm = 'Pending';
               if (apiStatus === 'approve' || apiStatus === 'approved') statusNorm = 'Approved';
               else if (apiStatus === 'reject' || apiStatus === 'rejected') statusNorm = 'Rejected';
               else if (apiStatus === 'cancel' || apiStatus === 'cancelled') statusNorm = 'Cancelled';
+              else if (apiStatus === 'conflict') statusNorm = 'Conflict';
 
               return {
-                id: b.bookingId ?? b.id,
-                roomName: b.facilityCode ?? b.facilityName ?? (b.facility?.code) ?? 'N/A',
-                facilityId: b.facilityId ?? b.facility?.facilityId ?? b.facilityCode ?? null,
-                date: b.bookingDate ?? b.date ?? null,
+                id: b.bookingId,
+                roomName: b.facilityCode ?? 'N/A',
+                facilityId: b.facilityId ?? null,
+                date: b.bookingDate ?? null,
                 startTime: start,
                 endTime: end,
-                purpose: b.purpose ?? b.description ?? '',
+                purpose: b.purpose ?? '',
                 status: statusNorm,
                 review: b.review,
               };
@@ -172,15 +108,17 @@ const Information = () => {
           }
         } else {
           console.warn('Failed to fetch user bookings:', res.statusText);
+          toast?.({ title: 'Cảnh báo', description: 'Không thể tải lịch sử đặt phòng', variant: 'destructive' });
         }
       } catch (err) {
         console.warn('Error fetching user bookings:', err);
+        toast?.({ title: 'Lỗi', description: 'Lỗi khi tải lịch sử đặt phòng', variant: 'destructive' });
       }
     };
 
-    // fetch bookings whenever user or slots change (slots provide time info)
+    // fetch bookings whenever user changes
     fetchUserBookings();
-  }, [user, slots]);
+  }, [user]);
 
   // Fetch booking stats
   useEffect(() => {
@@ -217,7 +155,7 @@ const Information = () => {
     return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('vi-VN');
   };
 
-  const formatTime = (t: string | undefined) => {
+  const formatTime = (t: string | number | undefined) => {
     if (!t) return '—';
     return String(t).split(':').slice(0, 2).join(':');
   };
@@ -293,26 +231,53 @@ const Information = () => {
                             >
                               {booking.status === 'Approved' ? 'Đã duyệt' :
                                booking.status === 'Pending' ? 'Chờ duyệt' :
+                               booking.status === 'Conflict' ? 'Trùng lịch' :
                                booking.status === 'Rejected' ? 'Từ chối' : 'Đã hủy'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {booking.status === 'Approved' ? (
+                            <div className="flex gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  setEditingBooking(booking);
-                                  setReviewDesc(booking.review?.description || '');
-                                  setReviewRating(booking.review?.rating ?? 5);
-                                  setReviewOpen(true);
+                                onClick={async () => {
+                                  setDetailLoading(true);
+                                  try {
+                                    const res = await fetch(`/api/Booking/Detail/${booking.id}`);
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      setBookingDetail(data);
+                                      setDetailOpen(true);
+                                    } else {
+                                      toast?.({ title: 'Lỗi', description: 'Không thể tải chi tiết booking', variant: 'destructive' });
+                                    }
+                                  } catch (err) {
+                                    toast?.({ title: 'Lỗi', description: 'Lỗi khi tải chi tiết', variant: 'destructive' });
+                                  } finally {
+                                    setDetailLoading(false);
+                                  }
                                 }}
+                                disabled={detailLoading}
                               >
-                                {booking.review ? 'Chỉnh sửa' : 'Đánh giá'}
+                                Xem chi tiết
                               </Button>
-                            ) : (
-                              <Button size="sm" variant="outline" disabled title="Chỉ được đánh giá khi đã duyệt">Đánh giá</Button>
-                            )}
+                              {booking.status === 'Approved' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingBooking(booking);
+                                    setReviewDesc(booking.review?.description || '');
+                                    setReviewRating(booking.review?.rating ?? 5);
+                                    setReviewOpen(true);
+                                  }}
+                                >
+                                  {booking.review ? 'Chỉnh sửa' : 'Đánh giá'}
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" disabled title="Chỉ được đánh giá khi đã duyệt">Đánh giá</Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -321,6 +286,65 @@ const Information = () => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Detail Dialog */}
+            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Chi tiết đặt phòng</DialogTitle>
+                </DialogHeader>
+                {detailLoading ? (
+                  <div className="flex justify-center py-8">
+                    <p className="text-muted-foreground">Đang tải...</p>
+                  </div>
+                ) : bookingDetail ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Mã booking</label>
+                        <p className="text-lg font-medium">{bookingDetail.bookingCode ?? bookingDetail.bookingId}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Phòng</label>
+                        <p className="text-lg font-medium">{bookingDetail.facilityCode ?? bookingDetail.facilityName ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Ngày đặt</label>
+                        <p className="text-lg font-medium">{formatDate(bookingDetail.bookingDate)}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Thời gian</label>
+                        <p className="text-lg font-medium">{formatTime(bookingDetail.startime)} - {formatTime(bookingDetail.endtime)}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Trạng thái</label>
+                        <p className="text-lg font-medium">
+                          <Badge variant={bookingDetail.status?.toLowerCase() === 'approved' ? 'default' : bookingDetail.status?.toLowerCase() === 'pending' ? 'secondary' : 'destructive'}>
+                            {bookingDetail.status || 'N/A'}
+                          </Badge>
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Số lượng người</label>
+                        <p className="text-lg font-medium">{bookingDetail.numberOfMember ?? 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-muted-foreground">Mục đích</label>
+                      <p className="text-base">{bookingDetail.purpose || '—'}</p>
+                    </div>
+                    {bookingDetail.rejectionReason && (
+                      <div className="bg-red-50 border border-red-200 p-3 rounded">
+                        <label className="text-sm font-semibold text-red-800">Lý do từ chối</label>
+                        <p className="text-base text-red-700">{bookingDetail.rejectionReason}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Không có dữ liệu</p>
+                )}
+              </DialogContent>
+            </Dialog>
 
             {/* Review Dialog */}
             <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
