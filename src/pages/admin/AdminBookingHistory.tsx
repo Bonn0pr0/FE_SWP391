@@ -3,9 +3,17 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Check, X, Eye, Loader2, Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Check, X, Eye, Loader2, Calendar, Clock, MapPin, Users, Search, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // --- Cấu hình API ---
@@ -47,7 +55,8 @@ interface BookingDetail {
 }
 
 export const AdminBookingHistory = () => {
-  const [statusFilter, setStatusFilter] = useState('all'); // Giữ lại nếu bạn muốn dùng filter sau này
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
   
   // State quản lý danh sách
@@ -228,84 +237,122 @@ export const AdminBookingHistory = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Lịch sử booking</h1>
-        <p className="text-muted-foreground mt-1">Quản lý yêu cầu đặt phòng</p>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Quản lý đặt phòng</h1>
+          <p className="text-muted-foreground">Danh sách yêu cầu đặt phòng</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={fetchBookings}>
+            <RefreshCw className={isLoading ? "animate-spin" : ""} />
+          </Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-           <div className="flex justify-end mb-2">
-             <Button variant="outline" size="sm" onClick={fetchBookings} disabled={isLoading}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Làm mới danh sách"}
-             </Button>
-           </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Người đặt</TableHead>
-                <TableHead>Phòng</TableHead>
-                <TableHead>Ngày</TableHead>
-                <TableHead>Thời gian</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Thao tác</TableHead>
-                <TableHead>Chi tiết</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">Đang tải...</TableCell></TableRow>
-              ) : filteredBookings.map(b => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-mono text-xs">#{b.id}</TableCell>
-                  <TableCell>{b.userEmail}</TableCell>
-                  <TableCell className="font-medium">{b.roomName}</TableCell>
-                  <TableCell>{new Date(b.date).toLocaleDateString('vi-VN')}</TableCell>
-                  <TableCell>{formatTime(b.startTime)} - {formatTime(b.endTime)}</TableCell>
-                  <TableCell>{renderStatusBadge(b.status)}</TableCell>
-                  <TableCell>
-                    {b.status === 'Pending' && (
-                      <div className="flex gap-1">
-                        <Button size="sm" className="h-7 px-2" onClick={() => handleApprove(b.id)}><Check className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="destructive" className="h-7 px-2" onClick={() => openRejectDialog(b.id)}><X className="w-3 h-3" /></Button>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => handleViewDetail(b.id)}>
-                      <Eye className="w-3 h-3 mr-1" /> Xem
-                    </Button>
-                  </TableCell>
+        <CardContent className="pt-6">
+          <div className="flex gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+              <Input 
+                placeholder="Tìm kiếm..." 
+                className="pl-10"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="pending">Chờ duyệt</SelectItem>
+                <SelectItem value="approved">Đã duyệt</SelectItem>
+                <SelectItem value="rejected">Từ chối</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Người đặt</TableHead>
+                  <TableHead>Phòng</TableHead>
+                  <TableHead>Ngày</TableHead>
+                  <TableHead>Thời gian</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Hành động</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={7} className="text-center py-4">Đang tải...</TableCell></TableRow>
+                ) : filteredBookings.length > 0 ? filteredBookings.map(b => (
+                  <TableRow key={b.id}>
+                    <TableCell className="font-mono text-xs">#{b.id}</TableCell>
+                    <TableCell className="font-medium">{b.userEmail}</TableCell>
+                    <TableCell>{b.roomName}</TableCell>
+                    <TableCell>{new Date(b.date).toLocaleDateString('vi-VN')}</TableCell>
+                    <TableCell>{formatTime(b.startTime)} - {formatTime(b.endTime)}</TableCell>
+                    <TableCell>{renderStatusBadge(b.status)}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      {b.status === 'Pending' && (
+                        <>
+                          <Button size="sm" className="h-8 px-2" onClick={() => handleApprove(b.id)}>
+                            <Check className="w-3 h-3" />
+                          </Button>
+                          <Button size="sm" variant="destructive" className="h-8 px-2" onClick={() => openRejectDialog(b.id)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </>
+                      )}
+                      <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => handleViewDetail(b.id)}>
+                        <Eye className="w-3 h-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Không tìm thấy booking nào
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* --- Reject Dialog --- */}
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <DialogContent>
-            <DialogHeader><DialogTitle>Từ chối yêu cầu</DialogTitle></DialogHeader>
-            <Textarea placeholder="Lý do từ chối..." value={rejectReason} onChange={e => setRejectReason(e.target.value)} />
-            <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Hủy</Button>
-                <Button variant="destructive" onClick={handleRejectConfirm}>Xác nhận</Button>
-            </div>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Từ chối yêu cầu</DialogTitle>
+            <DialogDescription>Vui lòng nhập lý do từ chối</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea 
+              placeholder="Nhập lý do từ chối..." 
+              value={rejectReason} 
+              onChange={e => setRejectReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Hủy</Button>
+            <Button variant="destructive" onClick={handleRejectConfirm}>Xác nhận</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* --- DETAIL DIALOG --- */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Chi tiết Đặt phòng</DialogTitle>
-            <DialogDescription>Thông tin chi tiết được lấy từ hệ thống.</DialogDescription>
+            <DialogTitle>Chi tiết đặt phòng</DialogTitle>
           </DialogHeader>
 
           {isDetailLoading ? (
@@ -314,88 +361,60 @@ export const AdminBookingHistory = () => {
                <p className="text-muted-foreground">Đang tải thông tin chi tiết...</p>
              </div>
           ) : bookingDetail ? (
-            <div className="grid gap-6 py-4">
-              
-              {/* Header Info */}
-              <div className="flex items-start justify-between border-b pb-4">
-                 <div>
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                       {bookingDetail.facilityName}
-                       <Badge variant="outline">{bookingDetail.facilityType}</Badge>
-                    </h3>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                       <MapPin className="w-3 h-3" /> {bookingDetail.campusName}
-                    </p>
-                 </div>
-                 <div className="text-right">
-                    <div className="mb-1">{renderStatusBadge(bookingDetail.status)}</div>
-                    <p className="text-xs font-mono text-muted-foreground">Ref: {bookingDetail.bookingCode}</p>
-                 </div>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                   {bookingDetail.facilityName}
+                   <Badge variant="outline">{bookingDetail.facilityType}</Badge>
+                   {renderStatusBadge(bookingDetail.status)}
+                </h3>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                   <MapPin className="w-3 h-3" /> {bookingDetail.campusName}
+                </p>
               </div>
 
-              {/* Grid Details */}
-              <div className="grid grid-cols-2 gap-6">
-                 
-                 {/* Cột Trái */}
-                 <div className="space-y-4">
-                    <div>
-                        <h4 className="text-sm font-medium mb-2 text-muted-foreground">Thời gian</h4>
-                        <div className="bg-muted/50 p-3 rounded-md space-y-2">
-                           <div className="flex items-center gap-2 text-sm">
-                              <Calendar className="w-4 h-4 text-primary" />
-                              <span className="font-semibold">{new Date(bookingDetail.bookingDate).toLocaleDateString('vi-VN')}</span>
-                           </div>
-                           <div className="flex items-center gap-2 text-sm">
-                              <Clock className="w-4 h-4 text-primary" />
-                              <span>{formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}</span>
-                           </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 className="text-sm font-medium mb-2 text-muted-foreground">Người yêu cầu</h4>
-                        <div className="flex items-center gap-3 p-3 border rounded-md">
-                           <div className="bg-primary/10 p-2 rounded-full">
-                              <Users className="w-4 h-4 text-primary" />
-                           </div>
-                           <div>
-                              <p className="font-medium text-sm">{bookingDetail.fullName}</p>
-                              <p className="text-xs text-muted-foreground">ID: {bookingDetail.bookingCode}</p>
-                           </div>
-                        </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium">Ngày đặt</label>
+                    <div className="p-3 bg-muted rounded flex items-center gap-2">
+                       <Calendar className="w-4 h-4 text-primary" />
+                       <span className="font-medium">{new Date(bookingDetail.bookingDate).toLocaleDateString('vi-VN')}</span>
                     </div>
                  </div>
-
-                 {/* Cột Phải */}
-                 <div className="space-y-4">
-                    <div>
-                        <h4 className="text-sm font-medium mb-2 text-muted-foreground">Thông tin phòng</h4>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                           <div className="p-2 bg-muted/30 rounded border text-center">
-                              <span className="block text-xs text-muted-foreground">Sức chứa</span>
-                              <span className="font-bold text-lg">{bookingDetail.capacity}</span>
-                           </div>
-                           <div className="p-2 bg-muted/30 rounded border text-center">
-                               <span className="block text-xs text-muted-foreground">Loại</span>
-                               <span className="font-medium truncate">{bookingDetail.facilityType}</span>
-                           </div>
-                        </div>
-                    </div>
-
-                    <div>
-                       <h4 className="text-sm font-medium mb-2 text-muted-foreground">Mục đích sử dụng</h4>
-                       <div className="p-3 bg-muted/30 rounded-md border min-h-[80px]">
-                          <p className="text-sm italic">"{bookingDetail.purpose}"</p>
-                       </div>
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium">Thời gian</label>
+                    <div className="p-3 bg-muted rounded flex items-center gap-2">
+                       <Clock className="w-4 h-4 text-primary" />
+                       <span>{formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}</span>
                     </div>
                  </div>
               </div>
 
-              {/* Footer Info */}
-              <div className="text-xs text-muted-foreground text-center border-t pt-4">
-                 Ngày tạo yêu cầu: {new Date(bookingDetail.createAt).toLocaleString('vi-VN')}
+              <div className="space-y-2">
+                 <label className="text-sm font-medium">Người yêu cầu</label>
+                 <div className="p-3 bg-muted rounded flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="font-medium">{bookingDetail.fullName}</span>
+                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium">Sức chứa</label>
+                    <div className="p-3 bg-muted rounded text-center font-bold">{bookingDetail.capacity}</div>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-sm font-medium">Loại phòng</label>
+                    <div className="p-3 bg-muted rounded text-center">{bookingDetail.facilityType}</div>
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-sm font-medium">Mục đích sử dụng</label>
+                 <div className="p-3 bg-muted rounded border min-h-[60px]">
+                    <p className="text-sm">"{bookingDetail.purpose}"</p>
+                 </div>
+              </div>
             </div>
           ) : (
             <div className="text-center py-8 text-destructive">
@@ -403,9 +422,9 @@ export const AdminBookingHistory = () => {
             </div>
           )}
           
-          <div className="flex justify-end">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Đóng</Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

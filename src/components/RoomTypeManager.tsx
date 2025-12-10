@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Building, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building, Loader2, RefreshCw, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // URL gốc (đã qua Proxy Vite)
@@ -30,6 +30,7 @@ export const RoomTypeManager = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '', icon: '🏢' });
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
   // 1. GET: Lấy danh sách
@@ -150,163 +151,148 @@ export const RoomTypeManager = () => {
     setIsEditOpen(true);
   };
 
+  const filteredRoomTypes = roomTypes.filter(room =>
+    room.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const iconOptions = ['🏢', '💻', '⚽', '🎓', '📚', '🎯', '🏋️', '🎨', '🎵', '🔬'];
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
-              Quản lý loại phòng
-            </CardTitle>
-            <CardDescription>Thêm, sửa, xóa các loại phòng trong hệ thống</CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={fetchRoomTypes} disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Thêm loại phòng
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Thêm loại phòng mới</DialogTitle>
-                  <DialogDescription>Nhập thông tin loại phòng mới</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Tên loại phòng *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Ví dụ: Meeting Room"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Mô tả</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Mô tả về loại phòng..."
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Icon (Local)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {iconOptions.map((icon) => (
-                        <button
-                          key={icon}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, icon })}
-                          className={`h-10 w-10 rounded-md text-xl flex items-center justify-center border-2 transition-all ${
-                            formData.icon === icon 
-                              ? 'border-primary bg-primary/10' 
-                              : 'border-border hover:border-primary/50'
-                          }`}
-                        >
-                          {icon}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Hủy</Button>
-                  <Button onClick={handleCreate}>Thêm</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+    <div className="space-y-4">
+      <div className="flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+          <Input 
+            placeholder="Tìm kiếm theo tên loại phòng..." 
+            className="pl-10"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
         </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Icon</TableHead>
-                <TableHead>Tên loại phòng</TableHead>
-                <TableHead>Mô tả</TableHead>
-                <TableHead className="text-center">Số phòng</TableHead>
-                <TableHead>Ngày tạo</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roomTypes.length === 0 ? (
-                 <TableRow>
-                    <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
-                        Không có dữ liệu
-                    </TableCell>
-                 </TableRow>
-              ) : (
-                roomTypes.map((roomType) => (
-                <TableRow key={roomType.id}>
-                  <TableCell className="text-2xl">{roomType.icon}</TableCell>
-                  <TableCell className="font-medium">{roomType.name}</TableCell>
-                  <TableCell className="max-w-[300px] truncate text-muted-foreground">
-                    {roomType.description}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">{roomType.roomCount}</Badge>
-                  </TableCell>
-                  <TableCell>{new Date(roomType.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(roomType)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Bạn có chắc chắn muốn xóa "{roomType.name}"?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Hủy</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(roomType.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Xóa
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
+        <Button variant="outline" size="icon" onClick={fetchRoomTypes} disabled={isLoading}>
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </Button>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-primary">
+              Thêm mới
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Thêm loại phòng mới</DialogTitle>
+              <DialogDescription>Nhập thông tin loại phòng mới</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Tên loại phòng *</Label>
+                <Input
+                  id="name"
+                  placeholder="Ví dụ: Meeting Room"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Mô tả</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Mô tả về loại phòng..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Hủy</Button>
+              <Button onClick={handleCreate}>Thêm</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Icon</TableHead>
+                  <TableHead>Tên loại phòng</TableHead>
+                  <TableHead>Mô tả</TableHead>
+                  <TableHead className="text-center">Số phòng</TableHead>
+                  <TableHead>Ngày tạo</TableHead>
+                  <TableHead className="text-right">Hành động</TableHead>
                 </TableRow>
-              )))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
+              </TableHeader>
+              <TableBody>
+                {filteredRoomTypes.length === 0 ? (
+                   <TableRow>
+                      <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                          Không có dữ liệu
+                      </TableCell>
+                   </TableRow>
+                ) : (
+                  filteredRoomTypes.map((roomType) => (
+                  <TableRow key={roomType.id}>
+                    <TableCell className="text-2xl">{roomType.icon}</TableCell>
+                    <TableCell className="font-medium">{roomType.name}</TableCell>
+                    <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                      {roomType.description}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">{roomType.roomCount}</Badge>
+                    </TableCell>
+                    <TableCell>{new Date(roomType.createdAt).toLocaleDateString('vi-VN')}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(roomType)}
+                        >
+                          <Pencil className="h-4 w-4 text-blue-600" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Không thể hoàn tác hành động này.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Hủy</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(roomType.id)}
+                                className="bg-red-600"
+                              >
+                                Xóa
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
       
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
             <DialogTitle>Sửa loại phòng</DialogTitle>
             </DialogHeader>
@@ -332,6 +318,6 @@ export const RoomTypeManager = () => {
             </DialogFooter>
         </DialogContent>
         </Dialog>
-    </Card>
+    </div>
   );
 };

@@ -37,7 +37,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Search, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Loader2, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { toast } from '@/hooks/use-toast';
 
 // --- 1. ĐỊNH NGHĨA TYPE ---
@@ -307,228 +308,191 @@ export const AdminRoomManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Quản lý phòng</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Quản lý phòng</h1>
+          <p className="text-muted-foreground">Danh sách các phòng học tập</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={fetchRooms}>
+            <RefreshCw className={loading ? "animate-spin" : ""} />
+          </Button>
+          <Button onClick={handleOpenCreate} className="bg-primary">
+            <Plus className="mr-2 h-4 w-4" /> Thêm mới
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tìm kiếm theo mã phòng..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="flex gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+              <Input 
+                placeholder="Tìm kiếm..." 
+                className="pl-10"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Danh sách phòng {loading && <Loader2 className="inline h-4 w-4 animate-spin ml-2"/>}</CardTitle>
-          <Button onClick={handleOpenCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Thêm phòng mới
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mã phòng</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead>Cơ sở (Campus)</TableHead>
-                <TableHead>Tầng</TableHead>
-                <TableHead>Sức chứa</TableHead>
-                <TableHead>Thiết bị</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                 <TableRow>
-                   <TableCell colSpan={8} className="text-center py-4">Đang tải dữ liệu...</TableCell>
-                 </TableRow>
-              ) : filteredRooms.length > 0 ? (
-                filteredRooms.map((room) => (
-                  <TableRow key={room.id}>
-                    <TableCell className="font-medium">{room.name}</TableCell>
-                    <TableCell>{room.type}</TableCell>
-                    <TableCell>{room.campus}</TableCell>
-                    <TableCell>
-                        {room.floor === 0 ? 'Tầng trệt' : `Tầng ${room.floor}`}
-                    </TableCell>
-                    <TableCell>{room.capacity}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {room.equipment.slice(0, 2).map((eq, idx) => (
-                          <Badge key={idx} variant="secondary" className="text-xs">
-                            {eq}
-                          </Badge>
-                        ))}
-                        {room.equipment.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{room.equipment.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(room.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenEdit(room)}
-                        >
-                          <Pencil className="h-4 w-4" />
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mã phòng</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead>Cơ sở</TableHead>
+                  <TableHead>Tầng</TableHead>
+                  <TableHead>Sức chứa</TableHead>
+                  <TableHead>Thiết bị</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Hành động</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-4">Đang tải dữ liệu...</TableCell>
+                  </TableRow>
+                ) : filteredRooms.length > 0 ? (
+                  filteredRooms.map((room) => (
+                    <TableRow key={room.id}>
+                      <TableCell className="font-medium">{room.name}</TableCell>
+                      <TableCell>{room.type}</TableCell>
+                      <TableCell>{room.campus}</TableCell>
+                      <TableCell>{room.floor === 0 ? 'Tầng trệt' : `Tầng ${room.floor}`}</TableCell>
+                      <TableCell>{room.capacity}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {room.equipment.slice(0, 2).map((eq, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {eq}
+                            </Badge>
+                          ))}
+                          {room.equipment.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{room.equipment.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-sm font-bold ${room.status === 'Available' ? 'text-green-600' : room.status === 'Maintenance' ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {room.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(room)}>
+                          <Pencil className="h-4 w-4 text-blue-600" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            setRoomToDelete(room);
-                            setIsDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        <AlertDialog>
+                          <AlertDialog>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setRoomToDelete(room);
+                              setIsDeleteDialogOpen(true);
+                            }}>
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </AlertDialog>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      Không tìm thấy phòng nào
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Không tìm thấy phòng nào
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingRoom ? 'Chỉnh sửa phòng' : 'Thêm phòng mới'}</DialogTitle>
-            <DialogDescription>
-              {editingRoom ? 'Cập nhật thông tin phòng' : 'Nhập thông tin để tạo phòng mới'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Mã phòng / Tên phòng</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="VD: P.A101"
-              />
+        <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+                <DialogTitle>{editingRoom ? "Cập nhật thông tin" : "Thêm phòng mới"}</DialogTitle>
+                <DialogDescription>{editingRoom ? "Sửa thông tin chi tiết." : "Tạo phòng mới."}</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                    <Label>Mã phòng</Label>
+                    <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Loại phòng</Label>
+                        <Select value={formData.type} onValueChange={v => setFormData({...formData, type: v})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {typeList.map((t) => <SelectItem key={t.typeId} value={t.typeName}>{t.typeName}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Cơ sở</Label>
+                        <Select value={formData.campus} onValueChange={v => setFormData({...formData, campus: v})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {campusList.map((c) => <SelectItem key={c.campusId} value={c.campusName}>{c.campusName}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label>Tầng</Label>
+                        <Input type="number" min="0" value={formData.floor} onChange={e => setFormData({...formData, floor: parseInt(e.target.value) || 0})} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Sức chứa</Label>
+                        <Input type="number" min="1" value={formData.capacity} onChange={e => setFormData({...formData, capacity: parseInt(e.target.value) || 1})} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Trạng thái</Label>
+                        <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Available">Sẵn sàng</SelectItem>
+                                <SelectItem value="Active">Hoạt động</SelectItem>
+                                <SelectItem value="Maintenance">Bảo trì</SelectItem>
+                                <SelectItem value="Occupied">Đang sử dụng</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label>Thiết bị (phân cách bằng dấu phẩy)</Label>
+                    <Input value={equipmentInput} onChange={e => setEquipmentInput(e.target.value)} placeholder="VD: Máy chiếu, Bảng trắng" />
+                </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Loại phòng</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Chọn loại" /></SelectTrigger>
-                  <SelectContent>
-                    {typeList.map((t) => <SelectItem key={t.typeId} value={t.typeName}>{t.typeName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Campus</Label>
-                <Select
-                  value={formData.campus}
-                  onValueChange={(value) => setFormData({ ...formData, campus: value })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Chọn cơ sở" /></SelectTrigger>
-                  <SelectContent>
-                      {campusList.map((c) => <SelectItem key={c.campusId} value={c.campusName}>{c.campusName}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="floor">Tầng</Label>
-                <Input
-                  id="floor"
-                  type="number"
-                  min="0"
-                  value={formData.floor}
-                  onChange={(e) => setFormData({ ...formData, floor: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="capacity">Sức chứa</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  value={formData.capacity}
-                  onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Trạng thái</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${status.color}`} />{status.label}</div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="equipment">Thiết bị (phân cách bằng dấu phẩy)</Label>
-              <Input
-                id="equipment"
-                value={equipmentInput}
-                onChange={(e) => setEquipmentInput(e.target.value)}
-                placeholder="VD: Máy chiếu, Bảng trắng"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave}>{editingRoom ? 'Cập nhật' : 'Thêm phòng'}</Button>
-          </DialogFooter>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
+                <Button onClick={handleSave}>{editingRoom ? "Lưu" : "Tạo mới"}</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa phòng</AlertDialogTitle>
-            <AlertDialogDescription>Bạn có chắc chắn muốn xóa phòng "{roomToDelete?.name}"? Hành động này không thể hoàn tác.</AlertDialogDescription>
+            <AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle>
+            <AlertDialogDescription>Không thể hoàn tác hành động này.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Xóa</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600">
+              Xóa
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 };
+export default AdminRoomManagement;

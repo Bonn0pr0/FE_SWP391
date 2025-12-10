@@ -11,12 +11,14 @@ interface AdminSidebarProps {
 const menuItems = [
   // { id: 'dashboard' as AdminSection, label: 'Admin Dashboard', icon: LayoutDashboard },
   // { id: 'overview' as AdminSection, label: 'Tổng quan', icon: BarChart3 },
-  { id: 'booking-history' as AdminSection, label: 'Lịch sử booking', icon: History },
-  { id: 'reports' as AdminSection, label: 'Báo cáo chi tiết', icon: FileText },
-  { id: 'feedback-management' as AdminSection, label: 'Quản lý phản hồi', icon: FileText },
+  { id: 'users' as AdminSection, label: 'Quản lý người dùng', icon: User },
+  { id: 'room-types' as AdminSection, label: 'Quản lý loại phòng', icon: Settings },
   { id: 'room-management' as AdminSection, label: 'Quản lý phòng', icon: Home },
-  { id: 'room-types' as AdminSection, label: 'Loại phòng', icon: Settings },
-  { id: 'users' as AdminSection, label: 'Người dùng', icon: User },
+  { id: 'booking-history' as AdminSection, label: 'Quản lý đặt phòng', icon: History },
+  // { id: 'reports' as AdminSection, label: 'Báo cáo chi tiết', icon: FileText },
+  { id: 'feedback-management' as AdminSection, label: 'Quản lý phản hồi', icon: FileText },
+
+
 ];
 
 export const AdminSidebar = ({ activeSection, onSectionChange }: AdminSidebarProps) => {

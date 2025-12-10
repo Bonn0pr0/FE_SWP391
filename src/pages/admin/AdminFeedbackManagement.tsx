@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, Eye, MessageSquare, Trash2, Star } from 'lucide-react';
+import { Search, Eye, MessageSquare, Trash2, Star, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Feedback {
@@ -221,42 +221,40 @@ export const AdminFeedbackManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Quản lý Feedback</h1>
-        <p className="text-muted-foreground mt-1">Xem và phản hồi feedback từ người dùng</p>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Quản lý đánh giá</h1>
+          <p className="text-muted-foreground">Xem và phản hồi đánh giá từ người dùng</p>
+        </div>
+        <Button variant="outline" size="icon" onClick={() => window.location.reload()}>
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Danh sách Feedback</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
               <Input
-                placeholder="Tìm kiếm theo tên, phòng, nội dung..."
+                placeholder="Tìm kiếm..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Trạng thái" />
-              </SelectTrigger>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="pending">Chờ xử lý</SelectItem>
                 <SelectItem value="responded">Đã phản hồi</SelectItem>
                 <SelectItem value="resolved">Đã giải quyết</SelectItem>
               </SelectContent>
             </Select>
             <Select value={ratingFilter} onValueChange={setRatingFilter}>
-              <SelectTrigger className="w-full md:w-[150px]">
-                <SelectValue placeholder="Đánh giá" />
-              </SelectTrigger>
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Sao" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả sao</SelectItem>
                 <SelectItem value="5">5 sao</SelectItem>
@@ -278,7 +276,7 @@ export const AdminFeedbackManagement = () => {
                   <TableHead>Nội dung</TableHead>
                   <TableHead>Trạng thái</TableHead>
                   <TableHead>Ngày gửi</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead className="text-right">Hành động</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -292,46 +290,29 @@ export const AdminFeedbackManagement = () => {
                   filteredFeedbacks.map((feedback) => (
                     <TableRow key={feedback.id}>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{feedback.userName}</p>
-                          <p className="text-sm text-muted-foreground">{feedback.userEmail}</p>
-                        </div>
+                        <div className="font-medium">{feedback.userName}</div>
+                        <div className="text-sm text-muted-foreground">{feedback.userEmail}</div>
                       </TableCell>
                       <TableCell>{feedback.roomName}</TableCell>
                       <TableCell>{renderStars(feedback.rating)}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{feedback.content}</TableCell>
                       <TableCell>{getStatusBadge(feedback.status)}</TableCell>
                       <TableCell>{formatDate(feedback.createdAt)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleViewFeedback(feedback)}
-                            title="Xem chi tiết"
-                          >
-                            <Eye className="h-4 w-4" />
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewFeedback(feedback)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenResponse(feedback)}>
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            setSelectedFeedback(feedback);
+                            setIsDeleteDialogOpen(true);
+                          }}>
+                            <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenResponse(feedback)}
-                            title="Phản hồi"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedFeedback(feedback);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                            title="Xóa"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))
@@ -344,57 +325,50 @@ export const AdminFeedbackManagement = () => {
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Chi tiết Feedback</DialogTitle>
+            <DialogTitle>Chi tiết đánh giá</DialogTitle>
           </DialogHeader>
           {selectedFeedback && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Người gửi</p>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Người gửi</label>
+                <div className="p-3 bg-muted rounded">
                   <p className="font-medium">{selectedFeedback.userName}</p>
                   <p className="text-sm text-muted-foreground">{selectedFeedback.userEmail}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Phòng</p>
-                  <p className="font-medium">{selectedFeedback.roomName}</p>
-                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Đánh giá</p>
-                {renderStars(selectedFeedback.rating)}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phòng</label>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.roomName}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Nội dung feedback</p>
-                <p className="mt-1 p-3 bg-muted rounded-md">{selectedFeedback.content}</p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Đánh giá</label>
+                <div className="p-3 bg-muted rounded">{renderStars(selectedFeedback.rating)}</div>
               </div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-muted-foreground">Trạng thái:</p>
-                {getStatusBadge(selectedFeedback.status)}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nội dung</label>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.content}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Ngày gửi</p>
-                <p>{formatDate(selectedFeedback.createdAt)}</p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Trạng thái</label>
+                <div>{getStatusBadge(selectedFeedback.status)}</div>
               </div>
               {selectedFeedback.adminResponse && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Phản hồi của Admin</p>
-                  <p className="mt-1 p-3 bg-primary/10 rounded-md">{selectedFeedback.adminResponse}</p>
-                  {selectedFeedback.respondedAt && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Phản hồi lúc: {formatDate(selectedFeedback.respondedAt)}
-                    </p>
-                  )}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phản hồi của Admin</label>
+                  <p className="p-3 bg-primary/10 rounded">{selectedFeedback.adminResponse}</p>
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Đóng</Button>
             {selectedFeedback?.status === 'responded' && (
-              <Button onClick={() => handleMarkResolved(selectedFeedback)}>
-                Đánh dấu đã giải quyết
-              </Button>
+              <Button onClick={() => {
+                handleMarkResolved(selectedFeedback);
+                setIsViewDialogOpen(false);
+              }}>Đánh dấu đã giải quyết</Button>
             )}
           </DialogFooter>
         </DialogContent>
@@ -402,35 +376,30 @@ export const AdminFeedbackManagement = () => {
 
       {/* Response Dialog */}
       <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Phản hồi Feedback</DialogTitle>
+            <DialogTitle>Phản hồi đánh giá</DialogTitle>
           </DialogHeader>
           {selectedFeedback && (
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-md">
-                <p className="text-sm text-muted-foreground mb-1">Nội dung feedback:</p>
-                <p>{selectedFeedback.content}</p>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nội dung feedback</label>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.content}</p>
               </div>
-              <div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Phản hồi của bạn</label>
                 <Textarea
                   value={responseText}
                   onChange={(e) => setResponseText(e.target.value)}
                   placeholder="Nhập phản hồi..."
                   rows={4}
-                  className="mt-1"
                 />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsResponseDialogOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={handleSubmitResponse} disabled={!responseText.trim()}>
-              Gửi phản hồi
-            </Button>
+            <Button variant="outline" onClick={() => setIsResponseDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSubmitResponse} disabled={!responseText.trim()}>Gửi phản hồi</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -439,14 +408,12 @@ export const AdminFeedbackManagement = () => {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa feedback</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa feedback này? Hành động này không thể hoàn tác.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle>
+            <AlertDialogDescription>Không thể hoàn tác hành động này.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteFeedback} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={handleDeleteFeedback} className="bg-red-600">
               Xóa
             </AlertDialogAction>
           </AlertDialogFooter>

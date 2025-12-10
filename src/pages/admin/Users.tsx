@@ -234,7 +234,7 @@ export default function Users() {
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Vai trò" /></SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Facility Admin">Facility Admin</SelectItem>
                     <SelectItem value="Lecturer">Lecturer</SelectItem>
                     <SelectItem value="Student">Student</SelectItem>
                 </SelectContent>

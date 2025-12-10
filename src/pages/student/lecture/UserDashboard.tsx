@@ -36,7 +36,7 @@ const UserDashboard = () => {
   const minDate = today.toISOString().split('T')[0]; // Ngày hiện tại
 
   const maxDateObj = new Date(today);
-  maxDateObj.setDate(today.getDate() + 3); // Cộng thêm 3 ngày
+  maxDateObj.setDate(today.getDate() ); // Cộng thêm 3 ngày
   const maxDate = maxDateObj.toISOString().split('T')[0];
   // -------------------------------------------------------------
 
@@ -195,7 +195,7 @@ const UserDashboard = () => {
 
           <Card className="gradient-pink text-white border-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Phòng khả dụng</CardTitle>
+              <CardTitle className="text-sm font-medium">Danh sách phòng</CardTitle>
               <MapPin className="h-4 w-4 opacity-80" />
             </CardHeader>
             <CardContent>
@@ -211,7 +211,7 @@ const UserDashboard = () => {
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <CardTitle>Phòng khả dụng hôm nay</CardTitle>
+                <CardTitle>Danh sách phòng</CardTitle>
                 <CardDescription>
                   {getCampusLabel()}
                 </CardDescription>
