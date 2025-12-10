@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, FC } from 'react';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,6 @@ import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Calendar, Clock, MapPin, Search } from 'lucide-react';
-
 interface Room {
   id: string;
   name: string;
@@ -22,6 +21,9 @@ interface Room {
   status?: string;
   floors?: number;
 }
+
+import RoomDetailModal from '@/components/RoomDetailModal';
+
 
 const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
@@ -42,6 +44,8 @@ const UserDashboard = () => {
 
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
@@ -278,125 +282,47 @@ const UserDashboard = () => {
                             </div>
                           )}
                           
-                          <Dialog>
+                          <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
                             <DialogTrigger asChild>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-                                onClick={() => setSelectedRoom(roomObj)}
+                                onClick={() => {
+                                  setSelectedRoom(roomObj);
+                                  setShowDetailModal(true);
+                                }}
                                 disabled={roomObj.status !== 'Available'}
                               >
-                                {roomObj.status === 'Available' ? 'Đặt phòng' : 'Không khả dụng'}
+                                {roomObj.status === 'Available' ? 'Xem chi tiết' : 'Không khả dụng'}
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
-                              <DialogHeader>
-                                <DialogTitle>{roomObj.name}</DialogTitle>
-                                <DialogDescription>
-                                  {roomObj.type} - Sức chứa: {roomObj.capacity} người
-                                  <br/>
-                                  <span className="text-xs text-muted-foreground">
-                                    Cơ sở: {roomObj.campus === 'campus1' ? 'Khu Công nghệ cao' : 'Nhà văn hóa'}
-                                  </span>
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4 py-4">
-                                
-                                {/* --- THAY ĐỔI 3: Cập nhật thẻ Input Date --- */}
-                                <div className="space-y-2">
-                                  <Label htmlFor="booking-date">Chọn ngày</Label>
-                                  <input 
-                                    id="booking-date"
-                                    type="date" 
-                                    className="w-full px-3 py-2 border border-input rounded-md"
-                                    
-                                    // Set Min & Max
-                                    min={minDate}
-                                    max={maxDate}
-                                    
-                                    // Binding State và OnChange
-                                    value={selectedDate}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                    
-                                    aria-label="Chọn ngày đặt phòng"
-                                  />
-                                </div>
-                                {/* ------------------------------------------- */}
-
-                                <div className="space-y-2">
-                                  <Label>Chọn khung giờ: </Label>
-                                  <div className="grid grid-cols-1 gap-2">
-                                    {(slots.length > 0 ? slots : [
-                                      { slotId: 1, startTime: '07:30:00', endTime: '09:00:00' },
-                                    ]).map((slot: any) => {
-                                      const startLabel = slot.startTime.substring(0, 5);
-                                      const endLabel = slot.endTime.substring(0, 5);
-                                      return (
-                                        <Button
-                                          key={slot.slotId}
-                                          className="w-full"
-                                          variant={selectedSlotId === slot.slotId ? 'default' : 'outline'}
-                                          size="sm"
-                                          onClick={() => {
-                                            setSelectedSlotId(slot.slotId);
-                                            setSelectedStartTime(slot.startTime);
-                                            setSelectedEndTime(slot.endTime);
-                                          }}
-                                        >
-                                          {startLabel} - {endLabel}
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Mục đích sử dụng</Label>
-                                  <textarea 
-                                    className="w-full px-3 py-2 border border-input rounded-md min-h-[80px]"
-                                    placeholder="Nhập mục đích sử dụng..."
-                                    value={purpose}
-                                    onChange={(e) => setPurpose(e.target.value)}
-                                  />
-                                </div>
-                                <Button className="w-full" disabled={!selectedRoom || isBooking}
-                                  onClick={async () => {
-                                    if (!selectedRoom) return;
-                                    setIsBooking(true);
-                                    const payload = {
-                                      bookingCode: `BK-${Date.now()}`,
-                                      bookingDate: selectedDate, 
-                                      purpose: purpose || 'Đặt phòng',
-                                      numberOfMember: selectedRoom.capacity || 0,
-                                      userId: (user as any)?.userId ?? 0,
-                                      facilityId: Number(selectedRoom.id), 
-                                      slotNumber: selectedSlotId,
-                                    };
-
-                                    try {
-                                      const res = await fetch('/api/Booking', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify(payload),
-                                      });
-                                      if (res.ok) {
-                                        const data = await res.json();
-                                        toast({ title: 'Thành công', description: 'Đặt phòng thành công.' });
-                                        if (data && data.id) mockBookings.push(data);
-                                      } else {
-                                        const text = await res.text();
-                                        toast({ title: 'Lỗi', description: text, variant: 'destructive' });
-                                      }
-                                    } catch (err) {
-                                      toast({ title: 'Lỗi mạng', description: String(err), variant: 'destructive' });
-                                    } finally {
-                                      setIsBooking(false);
-                                    }
+                            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+                              {selectedRoom && (
+                                <RoomDetailModal 
+                                  room={selectedRoom} 
+                                  onClose={() => setShowDetailModal(false)}
+                                  onBooking={() => {
+                                    setShowDetailModal(false);
+                                    setShowBookingModal(true);
                                   }}
-                                >
-                                  {isBooking ? 'Đang gửi...' : 'Xác nhận đặt phòng'}
-                                </Button>
-                              </div>
+                                  slots={slots}
+                                  minDate={minDate}
+                                  maxDate={maxDate}
+                                  selectedDate={selectedDate}
+                                  setSelectedDate={setSelectedDate}
+                                  selectedSlotId={selectedSlotId}
+                                  setSelectedSlotId={setSelectedSlotId}
+                                  setSelectedStartTime={setSelectedStartTime}
+                                  setSelectedEndTime={setSelectedEndTime}
+                                  purpose={purpose}
+                                  setPurpose={setPurpose}
+                                  isBooking={isBooking}
+                                  user={user}
+                                  toast={toast}
+                                  onBookingComplete={() => setShowDetailModal(false)}
+                                />
+                              )}
                             </DialogContent>
                           </Dialog>
                         </div>
