@@ -1,28 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Check, X, Eye, Loader2, Calendar, Clock, MapPin, Users, Search, RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar, Check, Clock, Eye, Loader2, MapPin, RefreshCw, Search, Users, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// --- Cấu hình API ---
-// Nếu bạn chạy qua Proxy (Vite) thì để tương đối, nếu không thì điền full URL https://localhost:44338/api/Booking
-const API_BASE_URL = '/api/Booking'; 
-
+const API_BASE_URL = '/api/Booking';
 const CURRENT_ADMIN_ID = 1;
 
-// Interface cho danh sách (Gọn nhẹ)
 interface BookingListItem {
   id: string | number;
   roomId: string;
@@ -32,12 +22,11 @@ interface BookingListItem {
   date: string;
   startTime: string;
   endTime: string;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' |'Feedbacked' | 'Conflict';
   purpose: string;
   createdAt: string;
 }
 
-// Interface cho Chi tiết
 interface BookingDetail {
   bookingId: number;
   bookingCode: string;
@@ -58,29 +47,35 @@ export const AdminBookingHistory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [bookings, setBookings] = useState<BookingListItem[]>([]);
-  
-  // State quản lý danh sách
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State quản lý chi tiết
   const [bookingDetail, setBookingDetail] = useState<BookingDetail | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-
-  // State quản lý từ chối
   const [rejectReason, setRejectReason] = useState('');
   const [selectedBookingId, setSelectedBookingId] = useState<string | number | null>(null);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  
   const { toast } = useToast();
 
-  // --- 1. Fetch Danh sách (List) ---
   const mapListResponseToFrontend = (apiData: any): BookingListItem => {
-    let status: any = 'Pending';
-    const apiStatus = apiData.status?.toLowerCase();
-    if (apiStatus === 'approve' || apiStatus === 'approved') status = 'Approved';
-    else if (apiStatus === 'reject' || apiStatus === 'rejected') status = 'Rejected';
-    else if (apiStatus === 'cancel' || apiStatus === 'cancelled') status = 'Cancelled';
+    const statusMap: Record<string, BookingListItem['status']> = {
+      'approve': 'Approved',
+      'approved': 'Approved',
+      'reject': 'Rejected',
+      'rejected': 'Rejected',
+      'cancel': 'Cancelled',
+      'cancelled': 'Cancelled',
+      'conflict': 'Conflict',
+      'feedbacked': 'Feedbacked',
+    };
+    
+    const apiStatus = String(apiData.status || '').toLowerCase();
+    let status: BookingListItem['status'] = 'Pending';
+    
+    if (apiStatus === 'conflict') {
+      status = 'Conflict';
+    } else {
+      status = statusMap[apiStatus] || 'Pending';
+    }
     
     return {
       id: apiData.bookingId,
@@ -91,7 +86,7 @@ export const AdminBookingHistory = () => {
       date: apiData.bookingDate,
       startTime: apiData.startTime,
       endTime: apiData.endTime,
-      status: status,
+      status,
       purpose: apiData.purpose,
       createdAt: apiData.createAt || new Date().toISOString(),
     };
@@ -103,10 +98,11 @@ export const AdminBookingHistory = () => {
       const response = await fetch(`${API_BASE_URL}/List`);
       if (!response.ok) throw new Error('Failed to fetch bookings');
       const data = await response.json();
+      console.debug('Fetch bookings response:', data);
       setBookings(data.map(mapListResponseToFrontend));
     } catch (error) {
-      console.error("Error fetching list:", error);
-      toast({ title: "Lỗi", description: "Không thể tải danh sách.", variant: "destructive" });
+      console.error('Error fetching list:', error);
+      toast({ title: 'Lỗi', description: 'Không thể tải danh sách.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +112,6 @@ export const AdminBookingHistory = () => {
     fetchBookings();
   }, []);
 
-  // --- 2. Fetch Chi tiết (Detail) ---
   const handleViewDetail = async (id: number | string) => {
     setIsDetailDialogOpen(true);
     setIsDetailLoading(true);
@@ -125,94 +120,90 @@ export const AdminBookingHistory = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/Detail/${id}`);
       if (!response.ok) throw new Error('Failed to fetch detail');
-      
       const data: BookingDetail = await response.json();
       setBookingDetail(data);
     } catch (error) {
-      console.error("Error fetching detail:", error);
-      toast({ title: "Lỗi", description: "Không thể tải chi tiết booking.", variant: "destructive" });
+      console.error('Error fetching detail:', error);
+      toast({ title: 'Lỗi', description: 'Không thể tải chi tiết booking.', variant: 'destructive' });
       setIsDetailDialogOpen(false);
     } finally {
       setIsDetailLoading(false);
     }
   };
 
-  // --- 3. Xử lý Duyệt/Từ chối (Đã sửa lỗi RejectionReason Required) ---
-  const updateBookingStatus = async (bookingId: string | number, newStatus: string, reason: string = "") => {
+  const updateBookingStatus = async (bookingId: string | number, newStatus: string, reason = '') => {
     try {
-      // 1. URL setup
       const url = `${API_BASE_URL}/${bookingId}?currentUserId=${CURRENT_ADMIN_ID}`;
-
-      // 2. Body Payload
-      const payloadStatus = newStatus === 'approve' ? 'approved' : 'rejected';
-
-      // SỬA LỖI TẠI ĐÂY:
-      // Backend yêu cầu trường này bắt buộc (Required).
-      // Không được gửi null. Nếu approve (không có lý do) thì gửi chuỗi rỗng "".
-      const safeReason = reason ? reason : ""; 
+      
+      // Backend expects "Approved" or "Rejected" (capitalized)
+      const payloadStatus = newStatus.toLowerCase() === 'approve' ? 'Approved' : 'Rejected';
+      
+      // If approving: send empty string for rejectionReason
+      // If rejecting: send the provided reason (validated before this is called)
+      const safeReason = payloadStatus === 'Approved' ? '' : reason;
 
       const payload = {
         status: payloadStatus,
-        rejectionReason: safeReason 
+        rejectionReason: safeReason,
       };
 
       const response = await fetch(url, {
-        method: 'PUT', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          'accept': '*/*' 
-        },
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("API Error Response:", errorText);
         throw new Error(errorText || 'Failed to update');
       }
 
       const data = await response.json();
-
-      // 3. Cập nhật UI
-      let displayStatus: any = 'Pending';
-      const returnedStatus = data.status?.toLowerCase();
+      console.debug('UpdateBooking response:', data);
       
-      if (returnedStatus === 'approved') displayStatus = 'Approved';
-      else if (returnedStatus === 'rejected') displayStatus = 'Rejected';
+      const statusMap: Record<string, BookingListItem['status']> = {
+        'approved': 'Approved',
+        'rejected': 'Rejected',
+      };
+      const displayStatus = statusMap[data.status?.toLowerCase() || ''] || 'Pending';
 
-      setBookings(prev => prev.map(b => (b.id === bookingId ? { ...b, status: displayStatus } : b)));
+      setBookings(prev => prev.map(b => (Number(b.id) === Number(bookingId) ? { ...b, status: displayStatus } : b)));
       
       if (bookingDetail && bookingDetail.bookingId === Number(bookingId)) {
-          setBookingDetail({ ...bookingDetail, status: data.status });
+        setBookingDetail({ ...bookingDetail, status: data.status });
       }
 
-      toast({ 
-        title: "Thành công", 
-        description: `Đã cập nhật trạng thái booking #${bookingId}.` 
-      });
-
+      toast({ title: 'Thành công', description: `Đã cập nhật trạng thái booking #${bookingId}.` });
+      
+      setStatusFilter('all');
+      await fetchBookings();
     } catch (error) {
-      console.error("Update failed:", error);
-      toast({ 
-        title: "Lỗi cập nhật", 
-        description: "Lỗi Validation từ Server hoặc lỗi kết nối.", 
-        variant: "destructive" 
-      });
+      console.error('Update failed:', error);
+      toast({ title: 'Lỗi cập nhật', description: 'Không thể cập nhật booking.', variant: 'destructive' });
     } finally {
       setIsRejectDialogOpen(false);
       setRejectReason('');
     }
   };
 
-  const handleApprove = (id: string | number) => updateBookingStatus(id, 'approve');
-  
-  const handleRejectConfirm = () => {
-    if (selectedBookingId && rejectReason.trim()) {
-      updateBookingStatus(selectedBookingId, 'reject', rejectReason);
-    } else {
-        // Nếu muốn bắt buộc nhập lý do mới cho reject thì giữ check này
-        toast({ title: "Lỗi", description: "Vui lòng nhập lý do từ chối", variant: "destructive" });
+  const handleApprove = (id: string | number) => {
+    const booking = bookings.find(b => b.id === id);
+    if (booking?.status === 'Conflict') {
+      const confirmed = window.confirm(
+        'Duyệt booking này sẽ tự động từ chối các booking trùng lịch. Tiếp tục?'
+      );
+      if (!confirmed) return;
     }
+    updateBookingStatus(id, 'approve');
+  };
+
+  const handleRejectConfirm = () => {
+    if (!selectedBookingId) return;
+    if (!rejectReason.trim()) {
+      toast({ title: 'Lỗi', description: 'Vui lòng nhập lý do từ chối', variant: 'destructive' });
+      return;
+    }
+    updateBookingStatus(selectedBookingId, 'reject', rejectReason);
   };
 
   const openRejectDialog = (id: string | number) => {
@@ -220,20 +211,26 @@ export const AdminBookingHistory = () => {
     setIsRejectDialogOpen(true);
   };
 
-  // --- Helpers ---
-  const formatTime = (t: string) => t?.split(':').slice(0, 2).join(':') || "";
-  const filteredBookings = bookings.filter(b => statusFilter === 'all' || b.status.toLowerCase() === statusFilter);
+  const formatTime = (t: string) => t?.split(':').slice(0, 2).join(':') || '';
+
+  const filteredBookings = bookings.filter(
+    b => statusFilter === 'all' || b.status.toLowerCase() === statusFilter
+  );
+
 
   const renderStatusBadge = (statusStr: string) => {
-    const s = statusStr?.toLowerCase();
-    let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
-    let label = "Chờ duyệt";
+    const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+      'approved': { variant: 'default', label: 'Đã duyệt' },
+      'rejected': { variant: 'destructive', label: 'Từ chối' },
+      'cancelled': { variant: 'outline', label: 'Đã hủy' },
+      'conflict': { variant: 'destructive', label: 'Trùng lịch' },
+      'feedbacked': { variant: 'secondary', label: 'Đã đánh giá' },
+      'pending': { variant: 'secondary', label: 'Chờ duyệt' },
+    };
 
-    if (s === 'approve' || s === 'approved') { variant = 'default'; label = 'Đã duyệt'; }
-    else if (s === 'reject' || s === 'rejected') { variant = 'destructive'; label = 'Từ chối'; }
-    else if (s === 'cancel' || s === 'cancelled') { variant = 'outline'; label = 'Đã hủy'; }
-
-    return <Badge variant={variant}>{label}</Badge>;
+    const s = statusStr?.toLowerCase() || 'pending';
+    const config = statusConfig[s] || statusConfig['pending'];
+    return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
   return (
@@ -252,22 +249,26 @@ export const AdminBookingHistory = () => {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4 mb-6">
+          <div className="mb-6 flex gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              <Input 
-                placeholder="Tìm kiếm..." 
+              <Input
+                placeholder="Tìm kiếm..."
                 className="pl-10"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="pending">Chờ duyệt</SelectItem>
+                <SelectItem value="conflict">Trùng lịch</SelectItem>
                 <SelectItem value="approved">Đã duyệt</SelectItem>
+                <SelectItem value="feedbacked">Đã đánh giá</SelectItem>
                 <SelectItem value="rejected">Từ chối</SelectItem>
               </SelectContent>
             </Select>
@@ -288,35 +289,68 @@ export const AdminBookingHistory = () => {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-4">Đang tải...</TableCell></TableRow>
-                ) : filteredBookings.length > 0 ? filteredBookings.map(b => (
-                  <TableRow key={b.id}>
-                    <TableCell className="font-mono text-xs">#{b.id}</TableCell>
-                    <TableCell className="font-medium">{b.userEmail}</TableCell>
-                    <TableCell>{b.roomName}</TableCell>
-                    <TableCell>{new Date(b.date).toLocaleDateString('vi-VN')}</TableCell>
-                    <TableCell>{formatTime(b.startTime)} - {formatTime(b.endTime)}</TableCell>
-                    <TableCell>{renderStatusBadge(b.status)}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {b.status === 'Pending' && (
-                        <>
-                          <Button size="sm" className="h-8 px-2" onClick={() => handleApprove(b.id)}>
-                            <Check className="w-3 h-3" />
-                          </Button>
-                          <Button size="sm" variant="destructive" className="h-8 px-2" onClick={() => openRejectDialog(b.id)}>
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </>
-                      )}
-                      <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => handleViewDetail(b.id)}>
-                        <Eye className="w-3 h-3" />
-                      </Button>
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-4 text-center">
+                      Đang tải...
                     </TableCell>
                   </TableRow>
-                )) : (
+                ) : filteredBookings.length > 0 ? (
+                  filteredBookings.map(b => (
+                    <TableRow key={b.id}>
+                      <TableCell className="font-mono text-xs">#{b.id}</TableCell>
+                      <TableCell className="font-medium">{b.userEmail}</TableCell>
+                      <TableCell>{b.roomName}</TableCell>
+                      <TableCell>{new Date(b.date).toLocaleDateString('vi-VN')}</TableCell>
+                      <TableCell>
+                        {formatTime(b.startTime)} - {formatTime(b.endTime)}
+                      </TableCell>
+                      <TableCell>{renderStatusBadge(b.status)}</TableCell>
+                      <TableCell className="space-x-2 text-right">
+                        {b.status === 'Pending' || b.status === 'Conflict' ? (
+                          <>
+                            <Button
+                              size="sm"
+                              className="h-8 px-2"
+                              onClick={() => handleApprove(b.id)}
+                              title={b.status === 'Conflict' ? 'Sẽ từ chối các booking trùng' : ''}
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 px-2"
+                              onClick={() => openRejectDialog(b.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2"
+                            disabled
+                            title="Booking đã finalized"
+                          >
+                            Locked
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2"
+                          onClick={() => handleViewDetail(b.id)}
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Không tìm thấy booking nào
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      Không tìm thấy booking
                     </TableCell>
                   </TableRow>
                 )}
@@ -326,29 +360,31 @@ export const AdminBookingHistory = () => {
         </CardContent>
       </Card>
 
-      {/* --- Reject Dialog --- */}
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Từ chối yêu cầu</DialogTitle>
-            <DialogDescription>Vui lòng nhập lý do từ chối</DialogDescription>
+            <DialogDescription>Nhập lý do từ chối</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Textarea 
-              placeholder="Nhập lý do từ chối..." 
-              value={rejectReason} 
+            <Textarea
+              placeholder="Nhập lý do từ chối..."
+              value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
               rows={4}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>Hủy</Button>
-            <Button variant="destructive" onClick={handleRejectConfirm}>Xác nhận</Button>
+            <Button variant="outline" onClick={() => setIsRejectDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button variant="destructive" onClick={handleRejectConfirm}>
+              Xác nhận
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* --- DETAIL DIALOG --- */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -356,74 +392,78 @@ export const AdminBookingHistory = () => {
           </DialogHeader>
 
           {isDetailLoading ? (
-             <div className="flex flex-col items-center justify-center py-10 space-y-4">
-               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-               <p className="text-muted-foreground">Đang tải thông tin chi tiết...</p>
-             </div>
+            <div className="flex flex-col items-center justify-center space-y-4 py-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Đang tải...</p>
+            </div>
           ) : bookingDetail ? (
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2">
-                   {bookingDetail.facilityName}
-                   <Badge variant="outline">{bookingDetail.facilityType}</Badge>
-                   {renderStatusBadge(bookingDetail.status)}
+                <h3 className="flex items-center gap-2 font-semibold">
+                  {bookingDetail.facilityName}
+                  <Badge variant="outline">{bookingDetail.facilityType || bookingDetail.facilityType || 'N/A'}</Badge>
+                  {renderStatusBadge(bookingDetail.status)}
                 </h3>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                   <MapPin className="w-3 h-3" /> {bookingDetail.campusName}
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3" /> {bookingDetail.campusName || bookingDetail.campusName || 'N/A'}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Ngày đặt</label>
-                    <div className="p-3 bg-muted rounded flex items-center gap-2">
-                       <Calendar className="w-4 h-4 text-primary" />
-                       <span className="font-medium">{new Date(bookingDetail.bookingDate).toLocaleDateString('vi-VN')}</span>
-                    </div>
-                 </div>
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Thời gian</label>
-                    <div className="p-3 bg-muted rounded flex items-center gap-2">
-                       <Clock className="w-4 h-4 text-primary" />
-                       <span>{formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}</span>
-                    </div>
-                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ngày đặt</label>
+                  <div className="flex items-center gap-2 rounded bg-muted p-3">
+                    <Calendar className="h-4 w-4 text-primary" />
+                    <span className="font-medium">
+                      {new Date(bookingDetail.bookingDate).toLocaleDateString('vi-VN')}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Thời gian</label>
+                  <div className="flex items-center gap-2 rounded bg-muted p-3">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span>
+                      {formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
-                 <label className="text-sm font-medium">Người yêu cầu</label>
-                 <div className="p-3 bg-muted rounded flex items-center gap-2">
-                    <Users className="w-4 h-4 text-primary" />
-                    <span className="font-medium">{bookingDetail.fullName}</span>
-                 </div>
+                <label className="text-sm font-medium">Người yêu cầu</label>
+                <div className="flex items-center gap-2 rounded bg-muted p-3">
+                  <Users className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{bookingDetail.fullName}</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Sức chứa</label>
-                    <div className="p-3 bg-muted rounded text-center font-bold">{bookingDetail.capacity}</div>
-                 </div>
-                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Loại phòng</label>
-                    <div className="p-3 bg-muted rounded text-center">{bookingDetail.facilityType}</div>
-                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Sức chứa</label>
+                  <div className="rounded bg-muted p-3 text-center font-bold">{bookingDetail.capacity}</div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Loại phòng</label>
+                  <div className="rounded bg-muted p-3 text-center">{bookingDetail.facilityType || 'N/A'}</div>
+                </div>
               </div>
 
               <div className="space-y-2">
-                 <label className="text-sm font-medium">Mục đích sử dụng</label>
-                 <div className="p-3 bg-muted rounded border min-h-[60px]">
-                    <p className="text-sm">"{bookingDetail.purpose}"</p>
-                 </div>
+                <label className="text-sm font-medium">Mục đích sử dụng</label>
+                <div className="min-h-[60px] rounded border bg-muted p-3">
+                  <p className="text-sm">"{bookingDetail.purpose}"</p>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-destructive">
-               Không tìm thấy dữ liệu booking.
-            </div>
+            <div className="py-8 text-center text-destructive">Không tìm thấy dữ liệu booking</div>
           )}
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>Đóng</Button>
+            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+              Đóng
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

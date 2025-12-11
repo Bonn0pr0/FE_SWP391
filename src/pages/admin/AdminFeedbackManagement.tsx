@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,72 +40,22 @@ import { Search, Eye, MessageSquare, Trash2, Star, RefreshCw } from 'lucide-reac
 import { useToast } from '@/hooks/use-toast';
 
 interface Feedback {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  roomName: string;
+  feedbackId: number;
+  fullName: string;
+  email: string;
+  facilityCode: string;
+  comments: string;
   rating: number;
-  content: string;
-  status: 'pending' | 'responded' | 'resolved';
-  createdAt: string;
+  submittedAt: string;
+  // optional detailed fields
+  typeName?: string;
+  // admin fields (local)
   adminResponse?: string;
-  respondedAt?: string;
+  status?: 'pending' | 'responded' | 'resolved';
 }
 
-const initialFeedbacks: Feedback[] = [
-  {
-    id: '1',
-    userId: 'u1',
-    userName: 'Nguyễn Văn A',
-    userEmail: 'nguyenvana@fpt.edu.vn',
-    roomName: 'Phòng họp A101',
-    rating: 4,
-    content: 'Phòng họp sạch sẽ, trang thiết bị đầy đủ. Tuy nhiên máy chiếu hơi cũ.',
-    status: 'pending',
-    createdAt: '2024-01-15T10:30:00',
-  },
-  {
-    id: '2',
-    userId: 'u2',
-    userName: 'Trần Thị B',
-    userEmail: 'tranthib@fe.edu.vn',
-    roomName: 'Phòng Lab B201',
-    rating: 5,
-    content: 'Phòng lab rất tốt, máy tính chạy nhanh, phần mềm đầy đủ.',
-    status: 'responded',
-    createdAt: '2024-01-14T14:20:00',
-    adminResponse: 'Cảm ơn bạn đã phản hồi tích cực!',
-    respondedAt: '2024-01-14T16:00:00',
-  },
-  {
-    id: '3',
-    userId: 'u3',
-    userName: 'Lê Văn C',
-    userEmail: 'levanc@fpt.edu.vn',
-    roomName: 'Sân bóng đá',
-    rating: 3,
-    content: 'Sân cỏ cần được bảo dưỡng, một số vùng bị hỏng.',
-    status: 'resolved',
-    createdAt: '2024-01-13T09:15:00',
-    adminResponse: 'Chúng tôi đã lên lịch bảo dưỡng sân vào tuần tới. Cảm ơn bạn đã phản hồi!',
-    respondedAt: '2024-01-13T11:30:00',
-  },
-  {
-    id: '4',
-    userId: 'u4',
-    userName: 'Phạm Thị D',
-    userEmail: 'phamthid@fpt.edu.vn',
-    roomName: 'Giảng đường C301',
-    rating: 2,
-    content: 'Điều hòa không hoạt động tốt, phòng khá nóng.',
-    status: 'pending',
-    createdAt: '2024-01-16T08:45:00',
-  },
-];
-
 export const AdminFeedbackManagement = () => {
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>(initialFeedbacks);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [ratingFilter, setRatingFilter] = useState<string>('all');
@@ -116,19 +66,70 @@ export const AdminFeedbackManagement = () => {
   const [responseText, setResponseText] = useState('');
   const { toast } = useToast();
 
+  // load feedback list from API
+  const fetchFeedbackList = async () => {
+    try {
+      const res = await fetch('/api/Feedback/feedbacklist');
+      if (!res.ok) throw new Error('Không thể tải danh sách feedback');
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      const mapped: Feedback[] = data.map((f: any) => ({
+        feedbackId: f.feedbackId ?? f.id,
+        fullName: f.fullName ?? f.fullname ?? '',
+        email: f.email ?? '',
+        facilityCode: f.facilityCode ?? f.roomName ?? '',
+        comments: f.comments ?? f.comment ?? '',
+        rating: f.rating ?? 0,
+        submittedAt: f.submittedAt ?? f.createdAt ?? '',
+        typeName: f.typeName ?? undefined,
+      }));
+      setFeedbacks(mapped);
+    } catch (err) {
+      console.warn('Error fetching feedback list', err);
+      toast?.({ title: 'Lỗi', description: 'Không thể tải danh sách feedback', variant: 'destructive' });
+    }
+  };
+
+  useEffect(() => {
+    fetchFeedbackList();
+  }, []);
+
   const filteredFeedbacks = feedbacks.filter((feedback) => {
     const matchesSearch =
-      feedback.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      feedback.roomName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      feedback.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || feedback.status === statusFilter;
+      (feedback.fullName ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (feedback.facilityCode ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (feedback.comments ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || (feedback.status ?? 'pending') === statusFilter;
     const matchesRating = ratingFilter === 'all' || feedback.rating === parseInt(ratingFilter);
     return matchesSearch && matchesStatus && matchesRating;
   });
 
   const handleViewFeedback = (feedback: Feedback) => {
-    setSelectedFeedback(feedback);
-    setIsViewDialogOpen(true);
+    // fetch detail from API
+    const fetchDetail = async () => {
+      try {
+        const res = await fetch(`/api/Feedback/feedbackdetail/${feedback.feedbackId}`);
+        if (!res.ok) throw new Error('Không thể tải chi tiết');
+        const json = await res.json();
+        const data = json?.data ?? json;
+        const mapped: Feedback = {
+          feedbackId: data.feedbackId,
+          fullName: data.fullName ?? data.fullname ?? '',
+          email: data.email ?? '',
+          facilityCode: data.facilityCode ?? '',
+          comments: data.comments ?? data.comments ?? '',
+          rating: data.rating ?? 0,
+          submittedAt: data.createdAt ?? data.submittedAt ?? '',
+          typeName: data.typeName ?? undefined,
+        };
+        setSelectedFeedback(mapped);
+        setIsViewDialogOpen(true);
+      } catch (err) {
+        toast?.({ title: 'Lỗi', description: String(err), variant: 'destructive' });
+      }
+    };
+
+    fetchDetail();
   };
 
   const handleOpenResponse = (feedback: Feedback) => {
@@ -141,7 +142,7 @@ export const AdminFeedbackManagement = () => {
     if (!selectedFeedback || !responseText.trim()) return;
 
     setFeedbacks(feedbacks.map((f) =>
-      f.id === selectedFeedback.id
+      f.feedbackId === selectedFeedback.feedbackId
         ? {
             ...f,
             adminResponse: responseText,
@@ -163,7 +164,7 @@ export const AdminFeedbackManagement = () => {
 
   const handleMarkResolved = (feedback: Feedback) => {
     setFeedbacks(feedbacks.map((f) =>
-      f.id === feedback.id ? { ...f, status: 'resolved' as const } : f
+      f.feedbackId === feedback.feedbackId ? { ...f, status: 'resolved' as const } : f
     ));
 
     toast({
@@ -175,27 +176,24 @@ export const AdminFeedbackManagement = () => {
   const handleDeleteFeedback = () => {
     if (!selectedFeedback) return;
 
-    setFeedbacks(feedbacks.filter((f) => f.id !== selectedFeedback.id));
+    const doDelete = async () => {
+      try {
+        const res = await fetch(`/api/Feedback/${selectedFeedback.feedbackId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Xóa thất bại');
+        setFeedbacks(prev => prev.filter((f) => f.feedbackId !== selectedFeedback.feedbackId));
+        toast({ title: 'Đã xóa feedback', description: 'Feedback đã được xóa thành công.' });
+      } catch (err) {
+        toast({ title: 'Lỗi', description: String(err), variant: 'destructive' });
+      } finally {
+        setIsDeleteDialogOpen(false);
+        setSelectedFeedback(null);
+      }
+    };
 
-    toast({
-      title: 'Đã xóa feedback',
-      description: 'Feedback đã được xóa thành công.',
-    });
-
-    setIsDeleteDialogOpen(false);
-    setSelectedFeedback(null);
+    doDelete();
   };
 
-  const getStatusBadge = (status: Feedback['status']) => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">Chờ xử lý</Badge>;
-      case 'responded':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Đã phản hồi</Badge>;
-      case 'resolved':
-        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">Đã giải quyết</Badge>;
-    }
-  };
+
 
   const renderStars = (rating: number) => {
     return (
@@ -245,13 +243,13 @@ export const AdminFeedbackManagement = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
+              {/* <SelectTrigger className="w-[180px]"><SelectValue placeholder="Trạng thái" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="pending">Chờ xử lý</SelectItem>
                 <SelectItem value="responded">Đã phản hồi</SelectItem>
                 <SelectItem value="resolved">Đã giải quyết</SelectItem>
-              </SelectContent>
+              </SelectContent> */}
             </Select>
             <Select value={ratingFilter} onValueChange={setRatingFilter}>
               <SelectTrigger className="w-[150px]"><SelectValue placeholder="Sao" /></SelectTrigger>
@@ -274,7 +272,6 @@ export const AdminFeedbackManagement = () => {
                   <TableHead>Phòng</TableHead>
                   <TableHead>Đánh giá</TableHead>
                   <TableHead>Nội dung</TableHead>
-                  <TableHead>Trạng thái</TableHead>
                   <TableHead>Ngày gửi</TableHead>
                   <TableHead className="text-right">Hành động</TableHead>
                 </TableRow>
@@ -288,23 +285,22 @@ export const AdminFeedbackManagement = () => {
                   </TableRow>
                 ) : (
                   filteredFeedbacks.map((feedback) => (
-                    <TableRow key={feedback.id}>
+                    <TableRow key={feedback.feedbackId}>
                       <TableCell>
-                        <div className="font-medium">{feedback.userName}</div>
-                        <div className="text-sm text-muted-foreground">{feedback.userEmail}</div>
+                        <div className="font-medium">{feedback.fullName}</div>
+                        <div className="text-sm text-muted-foreground">{feedback.email}</div>
                       </TableCell>
-                      <TableCell>{feedback.roomName}</TableCell>
+                      <TableCell>{feedback.facilityCode}</TableCell>
                       <TableCell>{renderStars(feedback.rating)}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{feedback.content}</TableCell>
-                      <TableCell>{getStatusBadge(feedback.status)}</TableCell>
-                      <TableCell>{formatDate(feedback.createdAt)}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{feedback.comments}</TableCell>
+                      <TableCell>{formatDate(feedback.submittedAt)}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="ghost" size="icon" onClick={() => handleViewFeedback(feedback)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenResponse(feedback)}>
+                        {/* <Button variant="ghost" size="icon" onClick={() => handleOpenResponse(feedback)}>
                           <MessageSquare className="h-4 w-4" />
-                        </Button>
+                        </Button> */}
                         <AlertDialog>
                           <Button variant="ghost" size="icon" onClick={() => {
                             setSelectedFeedback(feedback);
@@ -334,13 +330,17 @@ export const AdminFeedbackManagement = () => {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Người gửi</label>
                 <div className="p-3 bg-muted rounded">
-                  <p className="font-medium">{selectedFeedback.userName}</p>
-                  <p className="text-sm text-muted-foreground">{selectedFeedback.userEmail}</p>
+                  <p className="font-medium">{selectedFeedback.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{selectedFeedback.email}</p>
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Phòng</label>
-                <p className="p-3 bg-muted rounded">{selectedFeedback.roomName}</p>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.facilityCode}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Loại phòng</label>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.typeName ?? 'N/A'}</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Đánh giá</label>
@@ -348,11 +348,7 @@ export const AdminFeedbackManagement = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nội dung</label>
-                <p className="p-3 bg-muted rounded">{selectedFeedback.content}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Trạng thái</label>
-                <div>{getStatusBadge(selectedFeedback.status)}</div>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.comments}</p>
               </div>
               {selectedFeedback.adminResponse && (
                 <div className="space-y-2">
@@ -384,7 +380,7 @@ export const AdminFeedbackManagement = () => {
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Nội dung feedback</label>
-                <p className="p-3 bg-muted rounded">{selectedFeedback.content}</p>
+                <p className="p-3 bg-muted rounded">{selectedFeedback.comments}</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Phản hồi của bạn</label>
@@ -422,3 +418,6 @@ export const AdminFeedbackManagement = () => {
     </div>
   );
 };
+
+// fetch feedback list on mount
+// (placed after component to keep hooks at top-level inside component)

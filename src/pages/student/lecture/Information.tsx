@@ -89,6 +89,7 @@ const Information = () => {
               else if (apiStatus === 'reject' || apiStatus === 'rejected') statusNorm = 'Rejected';
               else if (apiStatus === 'cancel' || apiStatus === 'cancelled') statusNorm = 'Cancelled';
               else if (apiStatus === 'conflict') statusNorm = 'Conflict';
+              else if (apiStatus === 'feedbacked' ) statusNorm = 'Feedbacked';
 
               return {
                 id: b.bookingId,
@@ -99,7 +100,10 @@ const Information = () => {
                 endTime: end,
                 purpose: b.purpose ?? '',
                 status: statusNorm,
-                review: b.review,
+                // include feedback fields returned by API
+                feedbackId: b.feedbackId ?? 0,
+                comment: b.comment ?? '',
+                rating: b.rating ?? 0,
               };
             });
             setBookings(mapped);
@@ -170,23 +174,13 @@ const Information = () => {
           <aside className="w-64">
             <Card>
               <CardHeader>
-                <CardTitle>Quản lý</CardTitle>
-                <CardDescription>Chọn mục để xem</CardDescription>
+                <CardTitle>Thông tin cá nhân</CardTitle>
+                <CardDescription>Quản lý lịch sử và báo cáo</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col space-y-2">
-                  <button
-                    className={`text-left rounded-md p-2 ${active === 'history' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
-                    onClick={() => setActive('history')}
-                  >
-                    Lịch sử đặt phòng
-                  </button>
-                  <button
-                    className={`text-left rounded-md p-2 ${active === 'report' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/50'}`}
-                    onClick={() => setActive('report')}
-                  >
-                    Báo cáo sử dụng
-                  </button>
+                <div className="space-y-2">
+                  <Button variant={active === 'history' ? 'default' : 'ghost'} onClick={() => setActive('history')}>Lịch sử</Button>
+                  <Button variant={active === 'report' ? 'default' : 'ghost'} onClick={() => setActive('report')}>Báo cáo</Button>
                 </div>
               </CardContent>
             </Card>
@@ -232,6 +226,7 @@ const Information = () => {
                               {booking.status === 'Approved' ? 'Đã duyệt' :
                                booking.status === 'Pending' ? 'Chờ duyệt' :
                                booking.status === 'Conflict' ? 'Trùng lịch' :
+                               booking.status === 'Feedbacked' ? 'Đã đánh giá' :
                                booking.status === 'Rejected' ? 'Từ chối' : 'Đã hủy'}
                             </Badge>
                           </TableCell>
@@ -241,22 +236,22 @@ const Information = () => {
                                 size="sm"
                                 variant="outline"
                                 onClick={async () => {
-                                  setDetailLoading(true);
-                                  try {
-                                    const res = await fetch(`/api/Booking/Detail/${booking.id}`);
-                                    if (res.ok) {
-                                      const data = await res.json();
-                                      setBookingDetail(data);
-                                      setDetailOpen(true);
-                                    } else {
-                                      toast?.({ title: 'Lỗi', description: 'Không thể tải chi tiết booking', variant: 'destructive' });
+                                    setDetailLoading(true);
+                                    try {
+                                      const res = await fetch(`/api/Booking/Detail/${booking.id}`);
+                                      if (res.ok) {
+                                        const data = await res.json();
+                                        setBookingDetail(data);
+                                        setDetailOpen(true);
+                                      } else {
+                                        toast?.({ title: 'Lỗi', description: 'Không thể tải chi tiết booking', variant: 'destructive' });
+                                      }
+                                    } catch (err) {
+                                      toast?.({ title: 'Lỗi', description: 'Lỗi khi tải chi tiết', variant: 'destructive' });
+                                    } finally {
+                                      setDetailLoading(false);
                                     }
-                                  } catch (err) {
-                                    toast?.({ title: 'Lỗi', description: 'Lỗi khi tải chi tiết', variant: 'destructive' });
-                                  } finally {
-                                    setDetailLoading(false);
-                                  }
-                                }}
+                                  }}
                                 disabled={detailLoading}
                               >
                                 Xem chi tiết
@@ -265,14 +260,16 @@ const Information = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  className={booking.feedbackId > 0 ? 'bg-yellow-50 text-yellow-800' : ''}
                                   onClick={() => {
                                     setEditingBooking(booking);
-                                    setReviewDesc(booking.review?.description || '');
-                                    setReviewRating(booking.review?.rating ?? 5);
+                                    // Prefill from booking feedback fields if present
+                                    setReviewDesc(booking.comment || '');
+                                    setReviewRating((booking.rating && booking.rating > 0) ? booking.rating : 5);
                                     setReviewOpen(true);
                                   }}
                                 >
-                                  {booking.review ? 'Chỉnh sửa' : 'Đánh giá'}
+                                  {booking.feedbackId > 0 ? 'Chỉnh sửa' : 'Đánh giá'}
                                 </Button>
                               ) : (
                                 <Button size="sm" variant="outline" disabled title="Chỉ được đánh giá khi đã duyệt">Đánh giá</Button>
@@ -309,12 +306,20 @@ const Information = () => {
                         <p className="text-lg font-medium">{bookingDetail.facilityCode ?? bookingDetail.facilityName ?? 'N/A'}</p>
                       </div>
                       <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Loại phòng</label>
+                        <p className="text-lg font-medium">{bookingDetail.facilityType ?? bookingDetail.facilityTypeName ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-muted-foreground">Cơ sở</label>
+                        <p className="text-lg font-medium">{bookingDetail.campusName ?? bookingDetail.campus ?? 'N/A'}</p>
+                      </div>
+                      <div>
                         <label className="text-sm font-semibold text-muted-foreground">Ngày đặt</label>
                         <p className="text-lg font-medium">{formatDate(bookingDetail.bookingDate)}</p>
                       </div>
                       <div>
                         <label className="text-sm font-semibold text-muted-foreground">Thời gian</label>
-                        <p className="text-lg font-medium">{formatTime(bookingDetail.startime)} - {formatTime(bookingDetail.endtime)}</p>
+                        <p className="text-lg font-medium">{formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}</p>
                       </div>
                       <div>
                         <label className="text-sm font-semibold text-muted-foreground">Trạng thái</label>
@@ -385,25 +390,33 @@ const Information = () => {
 
                 <DialogFooter>
                   <div className="flex gap-2 w-full">
-                    <Button
-                      variant="ghost"
-                      onClick={async () => {
-                        if (!editingBooking) return;
-                        try {
-                          const reviewId = editingBooking.review?.id;
-                          if (reviewId) {
-                            const res = await fetch(`/api/Feedback/${reviewId}`, { method: 'DELETE' });
-                            if (!res.ok) throw new Error('Xóa feedback thất bại');
+                    {editingBooking?.feedbackId > 0 && (
+                      <Button
+                        variant="ghost"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={async () => {
+                          if (!editingBooking) return;
+                          const confirmed = window.confirm('Bạn có chắc muốn xóa đánh giá này không?');
+                          if (!confirmed) return;
+                          try {
+                            const reviewId = editingBooking.feedbackId ?? 0;
+                            if (reviewId > 0) {
+                              const res = await fetch(`/api/Feedback/${reviewId}`, { method: 'DELETE' });
+                              if (!res.ok) throw new Error('Xóa feedback thất bại');
+                            }
+                            // update local booking entry
+                            setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...b, feedbackId: 0, comment: '', rating: 0 } : b));
+                            toast?.({ title: 'Đã xóa đánh giá' });
+                          } catch (err) {
+                            toast?.({ title: 'Lỗi', description: String(err), variant: 'destructive' });
+                          } finally {
+                            setReviewOpen(false);
                           }
-                          setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...b, review: undefined } : b));
-                          toast?.({ title: 'Đã xóa đánh giá' });
-                        } catch (err) {
-                          toast?.({ title: 'Lỗi', description: String(err), variant: 'destructive' });
-                        } finally {
-                          setReviewOpen(false);
-                        }
-                      }}
-                    >Xóa</Button>
+                        }}
+                      >
+                        Xóa
+                      </Button>
+                    )}
 
                     <div className="ml-auto">
                       <Button
@@ -423,7 +436,7 @@ const Information = () => {
                               const detailRes = await fetch(`/api/Booking/Detail/${editingBooking.id}`);
                               if (detailRes.ok) {
                                 const detail = await detailRes.json();
-                                const cand = detail.facilityId ?? detail.facility?.facilityId ?? detail.facility?.id ?? detail.facilityId ?? null;
+                                const cand = detail.facilityId ?? detail.facility?.facilityId ?? detail.facility?.id ?? null;
                                 const nc = Number(cand);
                                 if (Number.isInteger(nc) && nc > 0) facilityIdNum = nc;
                               }
@@ -446,20 +459,41 @@ const Information = () => {
                           } as any;
 
                           try {
-                            const res = await fetch('/api/Feedback', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(payload),
-                            });
+                            const existingId = editingBooking.feedbackId ?? 0;
+                            if (existingId && existingId > 0) {
+                              // update
+                              const res = await fetch(`/api/Feedback/${existingId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload),
+                              });
 
-                            if (res.ok) {
-                              const data = await res.json();
-                              const reviewObj = { id: data.id ?? data.feedbackId ?? undefined, rating: reviewRating, description: reviewDesc };
-                              setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...b, review: reviewObj } : b));
-                              toast?.({ title: 'Đã lưu đánh giá' });
+                              if (res.ok) {
+                                const data = await res.json();
+                                const newId = data.id ?? data.feedbackId ?? existingId;
+                                setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating } : b));
+                                toast?.({ title: 'Đã cập nhật đánh giá' });
+                              } else {
+                                const text = await res.text();
+                                toast?.({ title: 'Lỗi khi cập nhật', description: text, variant: 'destructive' });
+                              }
                             } else {
-                              const text = await res.text();
-                              toast?.({ title: 'Lỗi khi lưu', description: text, variant: 'destructive' });
+                              // create
+                              const res = await fetch('/api/Feedback', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload),
+                              });
+
+                              if (res.ok) {
+                                const data = await res.json();
+                                const newId = data.id ?? data.feedbackId ?? 0;
+                                setBookings(prev => prev.map(b => b.id === editingBooking.id ? { ...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating } : b));
+                                toast?.({ title: 'Đã lưu đánh giá' });
+                              } else {
+                                const text = await res.text();
+                                toast?.({ title: 'Lỗi khi lưu', description: text, variant: 'destructive' });
+                              }
                             }
                           } catch (err) {
                             toast?.({ title: 'Lỗi mạng', description: String(err), variant: 'destructive' });
