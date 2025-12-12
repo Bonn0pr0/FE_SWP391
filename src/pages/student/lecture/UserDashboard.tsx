@@ -1,16 +1,29 @@
-import { useState, useEffect, useMemo, FC } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/Header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { mockRooms, mockBookings } from '@/lib/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Clock, MapPin, Search } from 'lucide-react';
+import { 
+  Calendar, 
+  MapPin, 
+  Search, 
+  Building2, 
+  Users, 
+  Zap, 
+  Clock,
+  LayoutGrid,
+  Info,
+  CalendarCheck
+} from 'lucide-react';
+import RoomDetailModal from '@/components/RoomDetailModal';
+
+// Định nghĩa Interface
 interface Room {
   id: string;
   name: string;
@@ -22,36 +35,34 @@ interface Room {
   floors?: number;
 }
 
-import RoomDetailModal from '@/components/RoomDetailModal';
-
-
 const UserDashboard = () => {
   const { user, updateCampus } = useAuth();
   const [facilities, setFacilities] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   
-  // --- THAY ĐỔI 1: Thêm hàm setSelectedDate để cập nhật state ---
+  // State quản lý ngày
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // --- THAY ĐỔI 2: Tính toán ngày Min và Max ---
+  // Tính toán ngày Min/Max
   const today = new Date();
-  const minDate = today.toISOString().split('T')[0]; // Ngày hiện tại
-
+  const minDate = today.toISOString().split('T')[0];
   const maxDateObj = new Date(today);
-  maxDateObj.setDate(today.getDate() + 31 ); // Cộng thêm 3 ngày
+  maxDateObj.setDate(today.getDate() + 31 );
   const maxDate = maxDateObj.toISOString().split('T')[0];
-  // -------------------------------------------------------------
 
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State quản lý Modal
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false); // Sẽ dùng cái này cho nút "Đặt ngay"
 
+  // State booking
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
   const [selectedEndTime, setSelectedEndTime] = useState<string>('09:00:00');
   const [purpose, setPurpose] = useState<string>('');
-  const [isBooking, setIsBooking] = useState(false);
+  const [isBooking, setIsBooking] = useState(false); 
   const { toast } = useToast();
 
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
@@ -60,36 +71,29 @@ const UserDashboard = () => {
     updateCampus(campus as any);
   };
 
+  // --- API Calls (Giữ nguyên) ---
   useEffect(() => {
     const fetchFacilities = async () => {
       const proxyUrl = '/api/Faciliti/List';
       const directUrl = '/api/Faciliti/List';
-
       try {
         let res = await fetch(proxyUrl);
-        if (!res.ok) {
-          res = await fetch(directUrl, { mode: 'cors' });
-        }
+        if (!res.ok) res = await fetch(directUrl, { mode: 'cors' });
         if (res.ok) {
           const data = await res.json();
           setFacilities(Array.isArray(data) ? data : []);
         } else {
-          console.warn('Facilities fetch failed:', res.statusText);
-          toast?.({ title: 'Cảnh báo', description: 'Không lấy được danh sách phòng từ server.' });
+          toast?.({ title: 'Cảnh báo', description: 'Không lấy được danh sách phòng.' });
         }
-      } catch (err) {
-        console.warn('Facilities fetch error:', err);
-        setFacilities([]);
-      }
+      } catch (err) { setFacilities([]); }
     };
     fetchFacilities();
   }, [user?.campus]); 
 
   useEffect(() => {
     const fetchSlots = async () => {
-      const proxyUrl = '/api/Slot';
       try {
-        const res = await fetch(proxyUrl);
+        const res = await fetch('/api/Slot');
         if (res.ok) {
           const data = await res.json();
           setSlots(Array.isArray(data) ? data : []);
@@ -104,14 +108,13 @@ const UserDashboard = () => {
     fetchSlots();
   }, []);
 
+  // --- Filtering Logic (Giữ nguyên) ---
   const filteredFacilities = useMemo(() => {
     const sourceData = facilities.length > 0 ? facilities : mockRooms;
-
     const normalizedData: Room[] = sourceData.map((item: any) => {
       const isCampus1 = item.campusName 
         ? item.campusName.toLowerCase().includes('công nghệ cao') 
         : item.campus === 'campus1';
-      
       return {
         id: String(item.facilityId || item.id),
         name: item.facilityCode || item.name,
@@ -123,218 +126,244 @@ const UserDashboard = () => {
         floors: item.floors
       };
     });
-
     return normalizedData.filter(room => {
       const currentCampus = (user as any)?.campus; 
       const matchCampus = currentCampus === 'all' || room.campus === currentCampus;
-      const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase());
-
+      const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          room.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchCampus && matchSearch;
     });
-
   }, [facilities, user?.campus, searchTerm]);
 
-  const getCampusLabel = () => {
-    const c = (user as any)?.campus;
-    if (c === 'all') return 'Tất cả cơ sở';
-    if (c === 'campus1') return 'Cơ sở 1 - Công nghệ cao';
-    return 'Cơ sở 2 - Nhà văn hóa';
+  // --- HÀM XỬ LÝ SỰ KIỆN ĐÃ SỬA ---
+  const handleViewDetails = (room: Room) => {
+    setSelectedRoom(room);
+    setIsBooking(false); // Chế độ xem chi tiết
+    setShowDetailModal(true); // Mở Modal Chi tiết
+  };
+
+  const handleBookNow = (room: Room) => {
+    setSelectedRoom(room);
+    setIsBooking(true); // Chế độ Booking
+    setShowBookingModal(true); // Mở thẳng Modal Booking
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50 relative">
+      <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-br from-blue-100 via-white to-orange-50 -z-10 rounded-b-[4rem]" />
+      
       <Header />
       
-      <main className="container py-8 space-y-8 animate-fade-in">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Chào mừng, {user?.email.split('@')[0]}</h1>
-            <p className="text-muted-foreground mt-1">
-              {user?.role === 'student' ? 'Sinh viên' : 'Giảng viên'}
+      <main className="container py-10 space-y-10 animate-fade-in">
+        
+        {/* Top Section */}
+        <div className="flex flex-col md:flex-row items-end justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
+              Xin chào, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">{user?.email.split('@')[0]}</span> 👋
+            </h1>
+            <p className="text-lg text-slate-500 font-medium">
+              {user?.role === 'student' ? 'Sinh viên' : 'Giảng viên'} • Quản lý đặt phòng
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="campus" className="text-sm">Chọn Campus</Label>
-              <Select 
-                value={(user as any)?.campus || 'campus1'} 
-                onValueChange={(value: 'campus1' | 'campus2' | 'all') => handleCampusChange(value)}
-              >
-                <SelectTrigger className="w-[240px]">
+          <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-2xl shadow-sm border border-slate-200 flex items-center">
+             <div className="px-4 text-sm font-semibold text-slate-500">Khu vực:</div>
+             <Select value={(user as any)?.campus || 'campus1'} onValueChange={(value: 'campus1' | 'campus2' | 'all') => handleCampusChange(value)}>
+                <SelectTrigger className="w-[260px] border-0 bg-transparent focus:ring-0 text-base font-bold text-blue-700">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Xem tất cả</SelectItem>
-                  <SelectItem value="campus1">Campus 1 - Cơ sở khu công nghệ cao</SelectItem>
-                  <SelectItem value="campus2">Campus 2 - Cơ sở nhà văn hóa</SelectItem>
+                  <SelectItem value="all">🌍 Tất cả cơ sở</SelectItem>
+                  <SelectItem value="campus1">🏢 Campus 1 - CNC</SelectItem>
+                  <SelectItem value="campus2">🏛️ Campus 2 - NVH</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
           </div>
         </div>
 
-        {/* Stats Cards Section */}
-        <div className="grid gap-4 md:grid-cols-3">
-          {/* <Card className="gradient-purple text-white border-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Đặt phòng đang hoạt động</CardTitle>
-              <Calendar className="h-4 w-4 opacity-80" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{userBookings.filter(b => b.status === 'Approved' || b.status === 'Pending').length}</div>
-            </CardContent>
-          </Card>
-
-          <Card className="gradient-blue text-white border-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tổng giờ đã đặt</CardTitle>
-              <Clock className="h-4 w-4 opacity-80" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {userBookings.reduce((acc, b) => acc + (b.endTime - b.startTime), 0)} giờ
-              </div>
-            </CardContent>
-          </Card> */}
-
-          <Card className="gradient-pink text-white border-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Danh sách phòng</CardTitle>
-              <MapPin className="h-4 w-4 opacity-80" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">
-                {filteredFacilities.length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Room List Section with Search */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <CardTitle>Danh sách phòng</CardTitle>
-                <CardDescription>
-                  {getCampusLabel()}
-                </CardDescription>
-              </div>
-              
-              <div className="relative w-full md:w-[300px]">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        {/* Main Content */}
+        <div className="space-y-6">
+          {/* Search Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 sticky top-4 z-30 bg-white/80 backdrop-blur-xl p-4 rounded-2xl shadow-md border border-white/50">
+             <div className="flex items-center gap-2">
+                <div className="bg-orange-100 p-2 rounded-lg text-orange-600">
+                    <Building2 className="h-5 w-5" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-slate-800">Danh sách phòng</h3>
+                    <p className="text-xs text-slate-500 hidden md:block">Chọn phòng phù hợp để đặt lịch</p>
+                </div>
+             </div>
+             <div className="relative w-full md:w-[400px] group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <Input
                   type="search"
-                  placeholder="Tìm theo loại phòng (VD: Classroom)..."
-                  className="pl-8"
+                  placeholder="Tìm theo tên phòng hoặc loại phòng..."
+                  className="pl-10 h-11 rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-200 transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {filteredFacilities.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">
-                Không tìm thấy phòng nào phù hợp với từ khóa "{searchTerm}" 
-                {(user as any)?.campus !== 'all' ? ' tại Campus này.' : '.'}
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredFacilities.map((roomObj, idx) => {
-                  const gradients = ['gradient-purple', 'gradient-blue', 'gradient-pink', 'gradient-orange', 'gradient-green'];
-                  const gradient = gradients[idx % gradients.length];
+             </div>
+          </div>
 
-                  return (
-                    <Card key={roomObj.id} className="overflow-hidden hover:shadow-lg transition-all hover:scale-105">
-                      <div className={`h-2 ${gradient}`} />
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{roomObj.name}</CardTitle>
-                            <CardDescription>{roomObj.type}</CardDescription>
+          {/* Room Grid */}
+          <Card className="border-0 bg-transparent shadow-none">
+            <CardContent className="p-0">
+              {filteredFacilities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
+                  <div className="bg-slate-100 p-4 rounded-full mb-4">
+                    <Search className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <p className="text-lg font-medium text-slate-600">Không tìm thấy phòng nào phù hợp</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {filteredFacilities.map((roomObj, idx) => {
+                    const statusColor = roomObj.status === 'Available' ? 'text-emerald-600 bg-emerald-50' : 'text-orange-600 bg-orange-50';
+                    const borderColor = roomObj.status === 'Available' ? 'group-hover:border-emerald-200' : 'group-hover:border-orange-200';
+
+                    return (
+                      <Card key={roomObj.id} className={`group overflow-hidden border border-slate-100 bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-2xl ${borderColor}`}>
+                        <div className={`h-2 w-full ${roomObj.status === 'Available' ? 'bg-gradient-to-r from-emerald-400 to-green-300' : 'bg-gradient-to-r from-orange-400 to-red-300'}`} />
+                        
+                        <CardHeader className="pb-3 pt-5">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                                <Badge variant="outline" className="mb-1 text-[10px] text-slate-400 border-slate-200">
+                                    {roomObj.campus === 'campus1' ? 'CNC' : 'NVH'}
+                                </Badge>
+                                <CardTitle className="text-xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                    {roomObj.name}
+                                </CardTitle>
+                                <CardDescription className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                                    {roomObj.type}
+                                </CardDescription>
+                            </div>
+                            <div className={`p-2 rounded-lg ${statusColor}`}>
+                                {roomObj.status === 'Available' ? <Zap className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                            </div>
                           </div>
-                          <Badge variant="secondary" className="font-semibold">{roomObj.capacity} chỗ</Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {(user as any)?.campus === 'all' && (
-                            <Badge variant="outline" className="mb-2 mr-2">
-                              {roomObj.campus === 'campus1' ? 'Khu CNC' : 'Nhà VH'}
-                            </Badge>
-                          )}
-                          
+                        </CardHeader>
+                        
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                             <div className="flex items-center gap-2 text-slate-600 bg-slate-50 p-2 rounded-lg">
+                                <Users className="h-4 w-4 text-blue-400" />
+                                <span className="font-semibold">{roomObj.capacity}</span> <span className="text-xs">chỗ</span>
+                             </div>
+                             <div className="flex items-center gap-2 text-slate-600 bg-slate-50 p-2 rounded-lg">
+                                <MapPin className="h-4 w-4 text-red-400" />
+                                <span className="text-xs truncate" title={`Tầng ${roomObj.floors}`}>Tầng {roomObj.floors || 'Trệt'}</span>
+                             </div>
+                          </div>
+
                           {roomObj.equipment && (
-                            <div className="text-xs text-muted-foreground mb-2 truncate" title={roomObj.equipment}>
-                              🔧 {roomObj.equipment}
-                            </div>
+                             <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+                                <div className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                                <span className="truncate" title={roomObj.equipment}>{roomObj.equipment}</span>
+                             </div>
                           )}
-                          <div className="flex items-center gap-2 text-sm">
-                            <div className={`h-3 w-3 rounded-full ${roomObj.status === 'Available' ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
-                            <span className="text-muted-foreground">
-                              {roomObj.status === 'Available' ? 'Sẵn sàng' : 'Bảo trì/Đã đầy'}
-                            </span>
-                          </div>
-                          {roomObj.floors && (
-                            <div className="text-xs text-muted-foreground">
-                              📍 Tầng {roomObj.floors}
-                            </div>
-                          )}
-                          
-                          <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-                            <DialogTrigger asChild>
+
+                          <div className="flex gap-2 mt-2">
+                              {/* Nút 1: Xem chi tiết */}
                               <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="w-full mt-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-                                onClick={() => {
-                                  setSelectedRoom(roomObj);
-                                  setShowDetailModal(true);
-                                }}
+                                variant="outline"
+                                className="flex-1 font-semibold text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600 h-10 rounded-xl transition-all"
+                                onClick={() => handleViewDetails(roomObj)}
+                              >
+                                <Info className="h-4 w-4 mr-1" />
+                                Chi tiết
+                              </Button>
+
+                              {/* Nút 2: Đặt ngay (Mở thẳng modal booking) */}
+                              <Button 
+                                className={`flex-1 font-semibold shadow-md transition-all duration-300 h-10 rounded-xl
+                                    ${roomObj.status === 'Available' 
+                                        ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:shadow-blue-200 hover:-translate-y-0.5' 
+                                        : 'bg-slate-100 text-slate-400 cursor-not-allowed hover:bg-slate-100'
+                                    }`}
+                                onClick={() => handleBookNow(roomObj)}
                                 disabled={roomObj.status !== 'Available'}
                               >
-                                {roomObj.status === 'Available' ? 'Xem chi tiết' : 'Không khả dụng'}
+                                {roomObj.status === 'Available' ? (
+                                    <>
+                                        <CalendarCheck className="h-4 w-4 mr-1" />
+                                        Đặt ngay
+                                    </>
+                                ) : 'Bảo trì'}
                               </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                              {selectedRoom && (
-                                <RoomDetailModal 
-                                  room={selectedRoom} 
-                                  onClose={() => setShowDetailModal(false)}
-                                  onBooking={() => {
-                                    setShowDetailModal(false);
-                                    setShowBookingModal(true);
-                                  }}
-                                  slots={slots}
-                                  minDate={minDate}
-                                  maxDate={maxDate}
-                                  selectedDate={selectedDate}
-                                  setSelectedDate={setSelectedDate}
-                                  selectedSlotId={selectedSlotId}
-                                  setSelectedSlotId={setSelectedSlotId}
-                                  setSelectedStartTime={setSelectedStartTime}
-                                  setSelectedEndTime={setSelectedEndTime}
-                                  purpose={purpose}
-                                  setPurpose={setPurpose}
-                                  isBooking={isBooking}
-                                  user={user}
-                                  toast={toast}
-                                  onBookingComplete={() => setShowDetailModal(false)}
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
+
+      {/* --- MODAL 1: XEM CHI TIẾT --- */}
+      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 rounded-2xl shadow-2xl">
+            {selectedRoom && (
+            <RoomDetailModal 
+                room={selectedRoom} 
+                onClose={() => setShowDetailModal(false)}
+                onBooking={() => {
+                    // Nếu bấm nút đặt trong modal chi tiết, chuyển sang modal booking
+                    setShowDetailModal(false);
+                    setShowBookingModal(true);
+                }}
+                slots={slots}
+                minDate={minDate}
+                maxDate={maxDate}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                selectedSlotId={selectedSlotId}
+                setSelectedSlotId={setSelectedSlotId}
+                setSelectedStartTime={setSelectedStartTime}
+                setSelectedEndTime={setSelectedEndTime}
+                purpose={purpose}
+                setPurpose={setPurpose}
+                isBooking={false} // Luôn là false vì đây là modal chi tiết
+                user={user}
+                toast={toast}
+                onBookingComplete={() => setShowDetailModal(false)}
+            />
+            )}
+        </DialogContent>
+      </Dialog>
+
+      {/* --- MODAL 2: ĐẶT PHÒNG NGAY --- */}
+      <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 rounded-2xl shadow-2xl">
+            {selectedRoom && (
+            <RoomDetailModal 
+                room={selectedRoom} 
+                onClose={() => setShowBookingModal(false)}
+                // Không cần onBooking vì đang ở trong booking rồi
+                onBooking={() => {}}
+                slots={slots}
+                minDate={minDate}
+                maxDate={maxDate}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                selectedSlotId={selectedSlotId}
+                setSelectedSlotId={setSelectedSlotId}
+                setSelectedStartTime={setSelectedStartTime}
+                setSelectedEndTime={setSelectedEndTime}
+                purpose={purpose}
+                setPurpose={setPurpose}
+                isBooking={true} // Luôn là true để hiển thị form đặt phòng
+                user={user}
+                toast={toast}
+                onBookingComplete={() => setShowBookingModal(false)}
+            />
+            )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
