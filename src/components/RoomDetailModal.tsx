@@ -193,7 +193,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
         const data = await res.json();
         toast({ 
           title: '🎉 Thành công!', 
-          description: 'Yêu cầu đặt phòng của bạn đã được gửi.',
+          description: 'Yêu cầu đặt lịch của bạn đã được gửi.',
           className: "bg-emerald-50 border-emerald-200 text-emerald-800"
         });
         
@@ -205,7 +205,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
         const text = await res.text();
         console.error("API Error:", text);
         toast({ 
-            title: 'Đặt phòng thất bại', 
+            title: 'Đặt lịch thất bại', 
             description: text || "Server trả về lỗi không xác định", 
             variant: 'destructive' 
         });
@@ -233,7 +233,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
             </div>
             <div>
                 <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
-                    Đặt phòng {room.name}
+                    Đặt lịch {room.name}
                 </h3>
                 <p className="text-sm text-slate-500">Điền thông tin để hoàn tất</p>
             </div>
@@ -357,7 +357,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
               >
                 {isSubmitting ? 'Đang gửi...' : (
                     <>
-                        Xác nhận đặt phòng <Send className="w-4 h-4 ml-2" />
+                        Xác nhận đặt lịch <Send className="w-4 h-4 ml-2" />
                     </>
                 )}
               </Button>
@@ -455,7 +455,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
             )}
 
             {/* Slots List */}
-            {detailSlotsData && detailSlotsData.length > 0 ? (
+            {/* {detailSlotsData && detailSlotsData.length > 0 ? (
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                 <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                     <Clock className="w-4 h-4 text-teal-500" /> Ca học trong ngày
@@ -478,7 +478,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
                     <Clock className="w-5 h-5 text-yellow-600" />
                     <p className="text-sm text-yellow-800 font-medium">Không có ca nào khả dụng.</p>
                 </div>
-            )}
+            )} */}
 
             {/* Reviews */}
             <div className="border-t border-slate-100 pt-4">
@@ -529,7 +529,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
                 onClick={() => setIsInBookingMode(true)}
                 disabled={detailData?.status !== 'Available' || !slots || slots.length === 0}
               >
-                {detailData?.status !== 'Available' ? 'Đang bảo trì' : !slots || slots.length === 0 ? 'Hết chỗ' : 'Đặt phòng ngay'}
+                {detailData?.status !== 'Available' ? 'Đang bảo trì' : !slots || slots.length === 0 ? 'Hết chỗ' : 'Đặt lịch ngay'}
               </Button>
             </div>
           </div>

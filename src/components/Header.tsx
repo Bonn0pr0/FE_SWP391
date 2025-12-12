@@ -100,7 +100,7 @@ export const Header = () => {
 
         <nav className="hidden md:flex items-center space-x-10">
           <Link to="/dashboard" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-            Đặt phòng
+            Đặt lịch
           </Link>
           <Link to="/details" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
             Chi tiết

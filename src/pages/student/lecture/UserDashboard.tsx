@@ -18,9 +18,18 @@ import {
   Zap, 
   Clock,
   Info,
-  CalendarCheck
+  CalendarCheck,
+  Filter 
 } from 'lucide-react';
 import RoomDetailModal from '@/components/RoomDetailModal';
+
+// Interface cho loại phòng từ API
+interface FacilityType {
+  typeId: number;
+  typeName: string;
+  description: string;
+  createAt: string;
+}
 
 interface Room {
   id: string;
@@ -38,8 +47,11 @@ const UserDashboard = () => {
   const [facilities, setFacilities] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   
+  // State quản lý danh sách loại phòng và loại đang chọn
+  const [facilityTypes, setFacilityTypes] = useState<FacilityType[]>([]);
+  const [selectedType, setSelectedType] = useState<string>('All'); 
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  
   const today = new Date();
   const minDate = today.toISOString().split('T')[0];
   const maxDateObj = new Date(today);
@@ -58,12 +70,27 @@ const UserDashboard = () => {
   const [purpose, setPurpose] = useState<string>('');
   const { toast } = useToast();
 
-  const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
-
   const handleCampusChange = (campus: 'campus1' | 'campus2' | 'all') => {
     updateCampus(campus as any);
   };
 
+  // 1. Gọi API lấy danh sách Facility Type (TypeName)
+  useEffect(() => {
+    const fetchFacilityTypes = async () => {
+      try {
+        const res = await fetch('/api/FacilityType');
+        if (res.ok) {
+          const data = await res.json();
+          setFacilityTypes(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch facility types:", err);
+      }
+    };
+    fetchFacilityTypes();
+  }, []);
+
+  // Gọi API lấy danh sách phòng
   useEffect(() => {
     const fetchFacilities = async () => {
       const proxyUrl = '/api/Faciliti/List';
@@ -82,6 +109,7 @@ const UserDashboard = () => {
     fetchFacilities();
   }, [user?.campus]); 
 
+  // Gọi API lấy Slot
   useEffect(() => {
     const fetchSlots = async () => {
       try {
@@ -100,6 +128,7 @@ const UserDashboard = () => {
     fetchSlots();
   }, []);
 
+  // 2. Logic Lọc (useMemo) - Đã tối ưu hóa so sánh chuỗi
   const filteredFacilities = useMemo(() => {
     const sourceData = facilities.length > 0 ? facilities : mockRooms;
     const normalizedData: Room[] = sourceData.map((item: any) => {
@@ -109,7 +138,8 @@ const UserDashboard = () => {
       return {
         id: String(item.facilityId || item.id),
         name: item.facilityCode || item.name,
-        type: item.typeName || item.type || '',
+        // Mapping quan trọng: Lấy typeName từ API Facilities để khớp với nút lọc
+        type: item.typeName || item.type || '', 
         capacity: item.capacity || 0,
         campus: isCampus1 ? 'campus1' : 'campus2',
         equipment: item.equipment,
@@ -117,14 +147,21 @@ const UserDashboard = () => {
         floors: item.floors
       };
     });
+
     return normalizedData.filter(room => {
       const currentCampus = (user as any)?.campus; 
       const matchCampus = currentCampus === 'all' || room.campus === currentCampus;
+      
       const matchSearch = room.type.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           room.name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchCampus && matchSearch;
+      
+      // LOGIC LỌC THEO TYPE NAME (Bảo vệ case-insensitive)
+      const matchType = selectedType === 'All' || 
+                        room.type.toLowerCase() === selectedType.toLowerCase();
+
+      return matchCampus && matchSearch && matchType;
     });
-  }, [facilities, user?.campus, searchTerm]);
+  }, [facilities, user?.campus, searchTerm, selectedType]);
 
   const handleViewDetails = (room: Room) => {
     setSelectedRoom(room);
@@ -144,6 +181,7 @@ const UserDashboard = () => {
       
       <main className="container py-10 space-y-10 animate-fade-in">
         
+        {/* Header Greeting & Campus Select */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-6">
           <div className="space-y-2">
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
@@ -169,13 +207,14 @@ const UserDashboard = () => {
         </div>
 
         <div className="space-y-6">
+          {/* Search Bar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 sticky top-4 z-30 bg-white/80 backdrop-blur-xl p-4 rounded-2xl shadow-md border border-white/50">
              <div className="flex items-center gap-2">
                 <div className="bg-orange-100 p-2 rounded-lg text-orange-600">
                     <Building2 className="h-5 w-5" />
                 </div>
                 <div>
-                    <h3 className="font-bold text-slate-800">Danh sách phòng</h3>
+                    <h3 className="font-bold text-slate-800">Danh sách</h3>
                     <p className="text-xs text-slate-500 hidden md:block">Chọn phòng phù hợp để đặt lịch</p>
                 </div>
              </div>
@@ -191,6 +230,42 @@ const UserDashboard = () => {
              </div>
           </div>
 
+          {/* 3. KHU VỰC LỌC NHANH (QUICK FILTER) */}
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2 shrink-0">
+                <Filter className="h-4 w-4" />
+                Lọc nhanh:
+            </div>
+            
+            {/* Nút "Tất cả" */}
+            <Button 
+                variant={selectedType === 'All' ? 'default' : 'outline'}
+                onClick={() => setSelectedType('All')}
+                className={`rounded-full px-6 transition-all shrink-0 
+                  ${selectedType === 'All' 
+                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-md' 
+                    : 'border-slate-300 hover:border-blue-500 hover:text-blue-600 bg-white'}`}
+            >
+                Tất cả
+            </Button>
+
+            {/* Các nút Loại phòng từ Database */}
+            {facilityTypes.map((type) => (
+                <Button
+                    key={type.typeId}
+                    variant={selectedType === type.typeName ? 'default' : 'outline'}
+                    onClick={() => setSelectedType(type.typeName)}
+                    className={`rounded-full px-6 transition-all shrink-0 
+                        ${selectedType === type.typeName 
+                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200 shadow-md' 
+                            : 'border-slate-300 hover:border-blue-500 hover:text-blue-600 bg-white'}`}
+                >
+                    {type.typeName}
+                </Button>
+            ))}
+          </div>
+
+          {/* Danh sách phòng (Grid) */}
           <Card className="border-0 bg-transparent shadow-none">
             <CardContent className="p-0">
               {filteredFacilities.length === 0 ? (
