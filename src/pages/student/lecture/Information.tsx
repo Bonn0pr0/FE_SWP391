@@ -21,7 +21,7 @@ import {
   History,
   Building2,
   Star
-} from 'lucide-react'; // Đã thêm icon để đẹp hơn
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -47,13 +47,13 @@ const Information = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [bookingDetail, setBookingDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [stats, setStats] = useState<any>({
     totalBookings: 0,
     successRate: 0,
     mostBookedFacilityType: 'N/A',
   });
 
-  // --- Logic giữ nguyên ---
   useEffect(() => {
     const fetchUserBookings = async () => {
       try {
@@ -140,10 +140,6 @@ const Information = () => {
     fetchBookingStats();
   }, [user]);
 
-  const total = userBookings.length;
-  const approvedCount = userBookings.filter(b => b.status === 'Approved').length;
-  // const successRate = total > 0 ? Math.round((approvedCount / total) * 100) : 0; // Dùng stats từ API hoặc tính tay tùy logic
-
   const formatDate = (d: any) => {
     if (!d) return '—';
     const dt = new Date(d);
@@ -155,7 +151,6 @@ const Information = () => {
     return String(t).split(':').slice(0, 2).join(':');
   };
 
-  // --- Helper renders ---
   const renderStatusBadge = (status: string) => {
     let className = "";
     let label = "";
@@ -174,7 +169,7 @@ const Information = () => {
         label = "Trùng lịch";
         break;
       case 'Feedbacked':
-        className = "bg-green-50 text-green-600 border-green-200"; // Đã xong + feedback
+        className = "bg-green-50 text-green-600 border-green-200";
         label = "Đã đánh giá";
         break;
       case 'Rejected':
@@ -189,23 +184,131 @@ const Information = () => {
     return <Badge variant="outline" className={`${className} px-3 py-1`}>{label}</Badge>;
   };
 
+  const handleSaveReview = async () => {
+    if (!editingBooking) return;
+    
+    let facilityIdNum = null;
+    const facilityIdRaw = editingBooking.facilityId ?? null;
+    if (facilityIdRaw != null && Number(facilityIdRaw) > 0) {
+      facilityIdNum = Number(facilityIdRaw);
+    }
+    
+    if (facilityIdNum == null) {
+      try {
+        const detailRes = await fetch(`/api/Booking/Detail/${editingBooking.id}`);
+        if (detailRes.ok) {
+          const detail = await detailRes.json();
+          const cand = detail.facilityId ?? detail.facility?.id;
+          if (Number(cand) > 0) facilityIdNum = Number(cand);
+        }
+      } catch(e) {
+        console.error('Error fetching facility ID:', e);
+      }
+    }
+
+    if (!facilityIdNum) {
+      toast?.({ title: 'Lỗi', description: 'Không tìm thấy ID phòng', variant: 'destructive'});
+      return;
+    }
+
+    const payload = {
+      comment: reviewDesc,
+      rating: reviewRating,
+      userId: (user as any)?.userId ?? 0,
+      facilityId: facilityIdNum,
+    };
+
+    try {
+      const existingId = editingBooking.feedbackId ?? 0;
+      const method = existingId > 0 ? 'PUT' : 'POST';
+      const url = existingId > 0 ? `/api/Feedback/${existingId}` : '/api/Feedback';
+      
+      const res = await fetch(url, {
+        method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+
+      if(res.ok) {
+        const data = await res.json();
+        const newId = data.id ?? data.feedbackId ?? (existingId > 0 ? existingId : 1); 
+        setBookings(prev => prev.map(b => 
+          b.id === editingBooking.id 
+            ? {...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating} 
+            : b
+        ));
+        toast?.({ title: 'Thành công', description: 'Đã lưu đánh giá' });
+        setReviewOpen(false);
+      } else {
+        toast?.({ title: 'Lỗi', description: 'Lưu thất bại', variant: 'destructive'});
+      }
+    } catch(err) {
+      toast?.({ title: 'Lỗi mạng', description: String(err), variant: 'destructive'});
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!editingBooking || !editingBooking.feedbackId) {
+      toast?.({ 
+        title: 'Lỗi', 
+        description: 'Không tìm thấy ID đánh giá', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+    
+    console.log('Deleting feedback ID:', editingBooking.feedbackId);
+    
+    try {
+      const res = await fetch(`/api/Feedback/${editingBooking.feedbackId}`, {
+        method: 'DELETE'
+      });
+      
+      if (res.ok) {
+        setBookings(prev => prev.map(b => 
+          b.id === editingBooking.id 
+            ? {...b, feedbackId: 0, comment: '', rating: 0} 
+            : b
+        ));
+        toast?.({ 
+          title: 'Đã xóa', 
+          description: 'Đánh giá đã được xóa thành công' 
+        });
+        setDeleteConfirmOpen(false);
+        setReviewOpen(false);
+      } else {
+        const errorText = await res.text();
+        console.error('Delete failed:', res.status, errorText);
+        toast?.({ 
+          title: 'Lỗi', 
+          description: 'Không thể xóa đánh giá', 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast?.({ 
+        title: 'Lỗi mạng', 
+        description: 'Lỗi khi xóa đánh giá', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-600 via-blue-500 to-teal-400 rounded-b-[3rem] shadow-2xl z-0" />
       
       <div className="relative z-10">
         <Header />
 
         <main className="container py-10">
-          {/* Page Title */}
           <div className="mb-8 text-white">
             <h1 className="text-4xl font-bold tracking-tight mb-2">Trung tâm cá nhân</h1>
             <p className="text-blue-100 opacity-90 text-lg">Quản lý lịch đặt phòng và theo dõi hoạt động của bạn</p>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left: Navigation Sidebar */}
             <aside className="w-full lg:w-72 flex-shrink-0">
               <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-lg overflow-hidden sticky top-24">
                 <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100/50 pb-4">
@@ -214,8 +317,8 @@ const Information = () => {
                       {(user as any)?.fullName?.[0] || 'U'}
                     </div>
                     <div>
-                        <CardTitle className="text-lg text-gray-800">{(user as any)?.fullName || 'Người dùng'}</CardTitle>
-                        <CardDescription className="text-orange-600/80">Sinh viên</CardDescription>
+                      <CardTitle className="text-lg text-gray-800">{(user as any)?.fullName || 'Người dùng'}</CardTitle>
+                      <CardDescription className="text-orange-600/80">Sinh viên</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -243,118 +346,117 @@ const Information = () => {
               </Card>
             </aside>
 
-            {/* Right: Content Area */}
             <section className="flex-1 min-w-0">
               {active === 'history' && (
                 <Card className="border-0 shadow-xl bg-white/95 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
                   <CardHeader className="border-b border-gray-100 pb-6">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="text-2xl text-blue-900 flex items-center gap-2">
-                                <CalendarDays className="h-6 w-6 text-orange-500" />
-                                Lịch sử đặt phòng
-                            </CardTitle>
-                            <CardDescription className="mt-1">Theo dõi trạng thái các yêu cầu của bạn</CardDescription>
-                        </div>
-                        <div className="text-sm font-medium text-blue-600 bg-blue-50 px-4 py-2 rounded-full">
-                            Tổng: {userBookings.length} yêu cầu
-                        </div>
+                      <div>
+                        <CardTitle className="text-2xl text-blue-900 flex items-center gap-2">
+                          <CalendarDays className="h-6 w-6 text-orange-500" />
+                          Lịch sử đặt phòng
+                        </CardTitle>
+                        <CardDescription className="mt-1">Theo dõi trạng thái các yêu cầu của bạn</CardDescription>
+                      </div>
+                      <div className="text-sm font-medium text-blue-600 bg-blue-50 px-4 py-2 rounded-full">
+                        Tổng: {userBookings.length} yêu cầu
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="rounded-md">
-                        <Table>
+                      <Table>
                         <TableHeader className="bg-slate-50/80">
-                            <TableRow className="hover:bg-transparent">
+                          <TableRow className="hover:bg-transparent">
                             <TableHead className="font-semibold text-blue-900 pl-6">Phòng</TableHead>
                             <TableHead className="font-semibold text-blue-900">Ngày & Giờ</TableHead>
                             <TableHead className="font-semibold text-blue-900">Mục đích</TableHead>
                             <TableHead className="font-semibold text-blue-900 text-center">Trạng thái</TableHead>
                             <TableHead className="font-semibold text-blue-900 text-right pr-6">Hoạt động</TableHead>
-                            </TableRow>
+                          </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {userBookings.length > 0 ? userBookings.map((booking, index) => (
+                          {userBookings.length > 0 ? userBookings.map((booking, index) => (
                             <TableRow key={booking.id} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                                <TableCell className="font-bold text-slate-700 pl-6">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-orange-400"></div>
-                                        {booking.roomName}
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col text-sm">
-                                        <span className="font-medium text-slate-700">{formatDate(booking.date)}</span>
-                                        <span className="text-slate-500 text-xs flex items-center mt-1">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
-                                        </span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="max-w-[200px] truncate text-slate-600" title={booking.purpose}>{booking.purpose}</TableCell>
-                                <TableCell className="text-center">
-                                    {renderStatusBadge(booking.status)}
-                                </TableCell>
-                                <TableCell className="text-right pr-6">
+                              <TableCell className="font-bold text-slate-700 pl-6">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-2 w-2 rounded-full bg-orange-400"></div>
+                                  {booking.roomName}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col text-sm">
+                                  <span className="font-medium text-slate-700">{formatDate(booking.date)}</span>
+                                  <span className="text-slate-500 text-xs flex items-center mt-1">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate text-slate-600" title={booking.purpose}>{booking.purpose}</TableCell>
+                              <TableCell className="text-center">
+                                {renderStatusBadge(booking.status)}
+                              </TableCell>
+                              <TableCell className="text-right pr-6">
                                 <div className="flex justify-end gap-2">
-                                    <Button
+                                  <Button
                                     size="sm"
                                     variant="outline"
                                     className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 h-8 text-xs font-medium rounded-lg"
                                     onClick={async () => {
-                                        setDetailLoading(true);
-                                        try {
+                                      setDetailLoading(true);
+                                      try {
                                         const res = await fetch(`/api/Booking/Detail/${booking.id}`);
                                         if (res.ok) {
-                                            const data = await res.json();
-                                            setBookingDetail(data);
-                                            setDetailOpen(true);
+                                          const data = await res.json();
+                                          setBookingDetail(data);
+                                          setDetailOpen(true);
                                         } else {
-                                            toast?.({ title: 'Lỗi', description: 'Không thể tải chi tiết', variant: 'destructive' });
+                                          toast?.({ title: 'Lỗi', description: 'Không thể tải chi tiết', variant: 'destructive' });
                                         }
-                                        } catch (err) {
+                                      } catch (err) {
                                         toast?.({ title: 'Lỗi', description: 'Lỗi khi tải chi tiết', variant: 'destructive' });
-                                        } finally {
+                                      } finally {
                                         setDetailLoading(false);
-                                        }
+                                      }
                                     }}
                                     disabled={detailLoading}
-                                    >
+                                  >
                                     Chi tiết
-                                    </Button>
+                                  </Button>
 
-                                    {booking.status === 'Approved' || booking.status === 'Feedbacked' ? (
+                                  {booking.status === 'Approved' || booking.status === 'Feedbacked' ? (
                                     <Button
-                                        size="sm"
-                                        className={`h-8 text-xs font-medium rounded-lg border shadow-sm transition-all ${
-                                            booking.feedbackId > 0 
-                                            ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 border-orange-200 hover:from-amber-200 hover:to-orange-200' 
-                                            : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border-transparent'
-                                        }`}
-                                        onClick={() => {
+                                      size="sm"
+                                      className={`h-8 text-xs font-medium rounded-lg border shadow-sm transition-all ${
+                                        booking.feedbackId > 0 
+                                          ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-orange-700 border-orange-200 hover:from-amber-200 hover:to-orange-200' 
+                                          : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:from-orange-600 hover:to-amber-600 border-transparent'
+                                      }`}
+                                      onClick={() => {
                                         setEditingBooking(booking);
                                         setReviewDesc(booking.comment || '');
                                         setReviewRating((booking.rating && booking.rating > 0) ? booking.rating : 5);
                                         setReviewOpen(true);
-                                        }}
+                                      }}
                                     >
-                                        {booking.feedbackId > 0 ? <><Star className="h-3 w-3 mr-1 fill-orange-600" /> Sửa đánh giá</> : 'Đánh giá'}
+                                      {booking.feedbackId > 0 ? <><Star className="h-3 w-3 mr-1 fill-orange-600" /> Sửa đánh giá</> : 'Đánh giá'}
                                     </Button>
-                                    ) : (
-                                        <div className="w-[80px]"></div> // Placeholder spacer
-                                    )}
+                                  ) : (
+                                    <div className="w-[80px]"></div>
+                                  )}
                                 </div>
-                                </TableCell>
+                              </TableCell>
                             </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
-                                        Chưa có lịch sử đặt phòng nào
-                                    </TableCell>
-                                </TableRow>
-                            )}
+                          )) : (
+                            <TableRow>
+                              <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
+                                Chưa có lịch sử đặt phòng nào
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </TableBody>
-                        </Table>
+                      </Table>
                     </div>
                   </CardContent>
                 </Card>
@@ -362,61 +464,57 @@ const Information = () => {
 
               {active === 'report' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Card className="border-0 shadow-xl bg-white/95 backdrop-blur-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-2xl text-green-800">
-                                <LayoutDashboard className="h-6 w-6 text-green-600" />
-                                Tổng quan hoạt động
-                            </CardTitle>
-                        </CardHeader>
+                  <Card className="border-0 shadow-xl bg-white/95 backdrop-blur-sm">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-2xl text-green-800">
+                        <LayoutDashboard className="h-6 w-6 text-green-600" />
+                        Tổng quan hoạt động
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-blue-600"></div>
+                      <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-blue-50">
+                        <div>
+                          <p className="text-sm font-medium text-blue-600 mb-1 uppercase tracking-wider">Tổng đơn</p>
+                          <p className="text-4xl font-bold text-slate-800">{stats.totalBookings}</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <CalendarDays className="h-6 w-6" />
+                        </div>
+                      </CardContent>
                     </Card>
 
-                    {/* Stats Grid - Lung linh hơn với Gradient Card riêng biệt */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Card 1: Tổng số */}
-                        <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-blue-600"></div>
-                            <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-blue-50">
-                                <div>
-                                    <p className="text-sm font-medium text-blue-600 mb-1 uppercase tracking-wider">Tổng đơn</p>
-                                    <p className="text-4xl font-bold text-slate-800">{stats.totalBookings}</p>
-                                </div>
-                                <div className="h-12 w-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <CalendarDays className="h-6 w-6" />
-                                </div>
-                            </CardContent>
-                        </Card>
+                    <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-600"></div>
+                      <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-green-50">
+                        <div>
+                          <p className="text-sm font-medium text-green-600 mb-1 uppercase tracking-wider">Tỷ lệ thành công</p>
+                          <p className="text-4xl font-bold text-slate-800">{stats.successRate}%</p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <CheckCircle2 className="h-6 w-6" />
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                        {/* Card 2: Tỷ lệ thành công - Màu Xanh Lá */}
-                        <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-400 to-emerald-600"></div>
-                            <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-green-50">
-                                <div>
-                                    <p className="text-sm font-medium text-green-600 mb-1 uppercase tracking-wider">Tỷ lệ thành công</p>
-                                    <p className="text-4xl font-bold text-slate-800">{stats.successRate}%</p>
-                                </div>
-                                <div className="h-12 w-12 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <CheckCircle2 className="h-6 w-6" />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Card 3: Loại phòng hot - Màu Cam */}
-                        <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
-                            <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-orange-50">
-                                <div>
-                                    <p className="text-sm font-medium text-orange-600 mb-1 uppercase tracking-wider">Hay đặt nhất</p>
-                                    <p className="text-xl font-bold text-slate-800 truncate max-w-[150px]" title={stats.mostBookedFacilityType}>
-                                        {stats.mostBookedFacilityType}
-                                    </p>
-                                </div>
-                                <div className="h-12 w-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <Building2 className="h-6 w-6" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <Card className="border-0 shadow-lg relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                      <CardContent className="p-6 flex items-center justify-between bg-gradient-to-br from-white to-orange-50">
+                        <div>
+                          <p className="text-sm font-medium text-orange-600 mb-1 uppercase tracking-wider">Hay đặt nhất</p>
+                          <p className="text-xl font-bold text-slate-800 truncate max-w-[150px]" title={stats.mostBookedFacilityType}>
+                            {stats.mostBookedFacilityType}
+                          </p>
+                        </div>
+                        <div className="h-12 w-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Building2 className="h-6 w-6" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               )}
             </section>
@@ -424,7 +522,6 @@ const Information = () => {
         </main>
       </div>
 
-      {/* --- Detail Dialog (Styled) --- */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-[650px] border-0 shadow-2xl rounded-2xl p-0 overflow-hidden">
           <DialogHeader className="bg-gradient-to-r from-blue-600 to-blue-500 p-6 text-white">
@@ -444,8 +541,8 @@ const Information = () => {
                     <p className="text-lg font-bold text-blue-900">{bookingDetail.bookingCode ?? bookingDetail.bookingId}</p>
                   </div>
                   <div className="space-y-1">
-                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Trạng thái</label>
-                     <div>{renderStatusBadge(bookingDetail.status)}</div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Trạng thái</label>
+                    <div>{renderStatusBadge(bookingDetail.status)}</div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Phòng / Cơ sở</label>
@@ -454,10 +551,10 @@ const Information = () => {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Thời gian</label>
                     <div className="flex items-center gap-2 text-gray-800 font-medium">
-                        <CalendarDays className="h-4 w-4 text-orange-500" />
-                        {formatDate(bookingDetail.bookingDate)}
-                        <span className="text-gray-300">|</span>
-                        {formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}
+                      <CalendarDays className="h-4 w-4 text-orange-500" />
+                      {formatDate(bookingDetail.bookingDate)}
+                      <span className="text-gray-300">|</span>
+                      {formatTime(bookingDetail.startTime)} - {formatTime(bookingDetail.endTime)}
                     </div>
                   </div>
                   <div className="space-y-1 col-span-2">
@@ -470,8 +567,8 @@ const Information = () => {
                   <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex gap-3">
                     <div className="mt-1"><div className="h-2 w-2 bg-red-500 rounded-full"></div></div>
                     <div>
-                        <label className="text-sm font-bold text-red-800 block mb-1">Lý do từ chối</label>
-                        <p className="text-sm text-red-700">{bookingDetail.rejectionReason}</p>
+                      <label className="text-sm font-bold text-red-800 block mb-1">Lý do từ chối</label>
+                      <p className="text-sm text-red-700">{bookingDetail.rejectionReason}</p>
                     </div>
                   </div>
                 )}
@@ -483,7 +580,6 @@ const Information = () => {
         </DialogContent>
       </Dialog>
 
-      {/* --- Review Dialog (Styled) --- */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="sm:max-w-[500px] border-0 shadow-2xl rounded-2xl">
           <DialogHeader>
@@ -504,7 +600,7 @@ const Information = () => {
               ))}
             </div>
             <div className="text-center font-medium text-orange-500">
-                {reviewRating === 5 ? 'Tuyệt vời!' : reviewRating === 4 ? 'Rất tốt' : reviewRating === 3 ? 'Bình thường' : 'Cần cải thiện'}
+              {reviewRating === 5 ? 'Tuyệt vời!' : reviewRating === 4 ? 'Rất tốt' : reviewRating === 3 ? 'Bình thường' : 'Cần cải thiện'}
             </div>
 
             <div>
@@ -519,75 +615,57 @@ const Information = () => {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-             {editingBooking?.feedbackId > 0 && (
-                <Button variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-600 mr-auto" onClick={async () => { /* Logic xóa giữ nguyên */ }}>
-                    Xóa đánh giá
-                </Button>
-             )}
-             <div className="flex gap-2 w-full sm:w-auto">
-                <Button variant="outline" onClick={() => setReviewOpen(false)} className="flex-1 sm:flex-none">Hủy</Button>
-                <Button 
-                    className="flex-1 sm:flex-none bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-200 border-0"
-                    onClick={async () => { /* Logic lưu giữ nguyên */ 
-                         // Copy lại logic cũ vào đây, tôi rút gọn để code dễ nhìn
-                         if (!editingBooking) return;
-                         let facilityIdNum = null;
-                         const facilityIdRaw = editingBooking.facilityId ?? null;
-                         if (facilityIdRaw != null && Number(facilityIdRaw) > 0) facilityIdNum = Number(facilityIdRaw);
-                         
-                         // Fallback fetch logic (simplified copy)
-                         if (facilityIdNum == null) {
-                            try {
-                                const detailRes = await fetch(`/api/Booking/Detail/${editingBooking.id}`);
-                                if (detailRes.ok) {
-                                    const detail = await detailRes.json();
-                                    const cand = detail.facilityId ?? detail.facility?.id;
-                                    if (Number(cand) > 0) facilityIdNum = Number(cand);
-                                }
-                            } catch(e){}
-                         }
+            {editingBooking?.feedbackId > 0 && (
+              <Button 
+                variant="ghost" 
+                className="text-red-500 hover:bg-red-50 hover:text-red-600 mr-auto" 
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                Xóa đánh giá
+              </Button>
+            )}
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" onClick={() => setReviewOpen(false)} className="flex-1 sm:flex-none">Hủy</Button>
+              <Button 
+                className="flex-1 sm:flex-none bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-200 border-0"
+                onClick={handleSaveReview}
+              >
+                Gửi đánh giá
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-                         if (!facilityIdNum) {
-                            toast?.({ title: 'Lỗi', description: 'Không tìm thấy ID phòng', variant: 'destructive'});
-                            return;
-                         }
-
-                         const payload = {
-                             comment: reviewDesc,
-                             rating: reviewRating,
-                             userId: (user as any)?.userId ?? 0,
-                             facilityId: facilityIdNum,
-                         };
-
-                         // Gọi API (giữ nguyên logic fetch PUT/POST)
-                         try {
-                            const existingId = editingBooking.feedbackId ?? 0;
-                            const method = existingId > 0 ? 'PUT' : 'POST';
-                            const url = existingId > 0 ? `/api/Feedback/${existingId}` : '/api/Feedback';
-                            
-                            const res = await fetch(url, {
-                                method,
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify(payload)
-                            });
-
-                            if(res.ok) {
-                                const data = await res.json();
-                                const newId = data.id ?? data.feedbackId ?? (existingId > 0 ? existingId : 1); 
-                                setBookings(prev => prev.map(b => b.id === editingBooking.id ? {...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating} : b));
-                                toast?.({ title: 'Thành công', description: 'Đã lưu đánh giá' });
-                                setReviewOpen(false);
-                            } else {
-                                toast?.({ title: 'Lỗi', description: 'Lưu thất bại', variant: 'destructive'});
-                            }
-                         } catch(err) {
-                            toast?.({ title: 'Lỗi mạng', description: String(err), variant: 'destructive'});
-                         }
-                    }}
-                >
-                    Gửi đánh giá
-                </Button>
-             </div>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px] border-0 shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="text-red-600 text-2xl">⚠️</span>
+              </div>
+              Xác nhận xóa
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 pt-2">
+              Bạn có chắc chắn muốn xóa đánh giá này không? Hành động này không thể hoàn tác.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="flex-1 sm:flex-none"
+            >
+              Hủy bỏ
+            </Button>
+            <Button 
+              className="flex-1 sm:flex-none bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleDeleteReview}
+            >
+              Xóa đánh giá
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

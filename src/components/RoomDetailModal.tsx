@@ -124,7 +124,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
         const approved = Array.isArray(data)
           ? data.filter((b: any) =>
               b.bookingDate === selectedDate &&
-              b.status && String(b.status).toLowerCase() === 'approved' &&
+              b.status && (String(b.status).toLowerCase() === 'approved' || String(b.status).toLowerCase() === 'feedbacked') &&
               (b.facilityCode === facilityCode || b.facilityCode === String(facilityCode))
             )
           : [];
@@ -173,7 +173,7 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
 
     const payload = {
       bookingDate: selectedDate,
-      purpose: purpose || 'Studying', // Default purpose nếu rỗng
+      purpose: purpose || '', // Default purpose nếu rỗng
       numberOfMember: numberOfMember,
       userId: Number(userId), // Đảm bảo là số
       facilityId: Number(room.id),
@@ -284,35 +284,46 @@ const RoomDetailModal: React.FC<RoomDetailModalProps> = ({
               </Label>
               <div className="grid grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
                 {(slots && slots.length > 0 ? slots : [{ slotId: 1, startTime: '07:30:00', endTime: '09:00:00' }]).map((slot: any) => {
-                  const startLabel = slot.startTime.substring(0, 5);
-                  const endLabel = slot.endTime.substring(0, 5);
-                  const isUnavailable = unavailableSlotIds.includes(slot.slotId);
-                  const isSelected = selectedSlotId === slot.slotId;
+                const startLabel = slot.startTime.substring(0, 5);
+                const endLabel = slot.endTime.substring(0, 5);
+                const isUnavailable = unavailableSlotIds.includes(slot.slotId);
+                const isSelected = selectedSlotId === slot.slotId;
 
-                  return (
-                    <button
-                      key={slot.slotId}
-                      disabled={isSubmitting || isUnavailable}
-                      onClick={() => {
-                        if (isUnavailable) return;
-                        setSelectedSlotId(slot.slotId);
-                        setSelectedStartTime(slot.startTime);
-                        setSelectedEndTime(slot.endTime);
-                      }}
-                      className={cn(
-                        "relative flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-300",
-                        isUnavailable 
-                            ? "bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed grayscale" 
-                            : isSelected 
-                                ? "bg-gradient-to-br from-orange-500 to-pink-500 border-transparent text-white shadow-lg shadow-orange-200 scale-[1.02]" 
-                                : "bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50 hover:shadow-md"
-                      )}
-                    >
-                      <span className="text-xs font-medium uppercase tracking-wider opacity-90">Slot {slot.slotNumber || slot.slotId}</span>
-                      <span className="text-sm font-bold mt-0.5">{startLabel} - {endLabel}</span>
-                      {isSelected && <CheckCircle2 className="absolute top-1 right-1 w-3 h-3 text-white/80" />}
-                    </button>
-                  );
+                // Kiểm tra nếu chọn ngày hôm nay và slot đã qua giờ
+                const now = new Date();
+                const today = now.toISOString().split('T')[0];
+                const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`;
+                const isPastTime = selectedDate === today && slot.startTime < currentTime;
+
+                return (
+                  <button
+                    key={slot.slotId}
+                    disabled={isSubmitting || isUnavailable || isPastTime}
+                    onClick={() => {
+                      if (isUnavailable || isPastTime) return;
+                      setSelectedSlotId(slot.slotId);
+                      setSelectedStartTime(slot.startTime);
+                      setSelectedEndTime(slot.endTime);
+                    }}
+                    className={cn(
+                      "relative flex flex-col items-center justify-center py-3 px-2 rounded-xl border transition-all duration-300",
+                      isUnavailable || isPastTime
+                        ? "bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed grayscale" 
+                        : isSelected 
+                          ? "bg-gradient-to-br from-orange-500 to-pink-500 border-transparent text-white shadow-lg shadow-orange-200 scale-[1.02]" 
+                          : "bg-white border-slate-200 text-slate-600 hover:border-orange-300 hover:bg-orange-50 hover:shadow-md"
+                    )}
+                  >
+                    <span className="text-xs font-medium uppercase tracking-wider opacity-90">
+                      Slot {slot.slotNumber || slot.slotId}
+                    </span>
+                    <span className="text-sm font-bold mt-0.5">{startLabel} - {endLabel}</span>
+                    {isSelected && <CheckCircle2 className="absolute top-1 right-1 w-3 h-3 text-white/80" />}
+                    {isPastTime && !isUnavailable && (
+                      <span className="absolute bottom-1 right-1 text-[9px] font-semibold text-slate-400">Đã qua</span>
+                    )}
+                  </button>
+                );
                 })}
               </div>
             </div>

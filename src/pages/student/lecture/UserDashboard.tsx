@@ -17,13 +17,11 @@ import {
   Users, 
   Zap, 
   Clock,
-  LayoutGrid,
   Info,
   CalendarCheck
 } from 'lucide-react';
 import RoomDetailModal from '@/components/RoomDetailModal';
 
-// Định nghĩa Interface
 interface Room {
   id: string;
   name: string;
@@ -40,29 +38,24 @@ const UserDashboard = () => {
   const [facilities, setFacilities] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
   
-  // State quản lý ngày
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // Tính toán ngày Min/Max
   const today = new Date();
   const minDate = today.toISOString().split('T')[0];
   const maxDateObj = new Date(today);
-  maxDateObj.setDate(today.getDate() + 31 );
+  maxDateObj.setDate(today.getDate() + 31);
   const maxDate = maxDateObj.toISOString().split('T')[0];
 
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State quản lý Modal
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false); // Sẽ dùng cái này cho nút "Đặt ngay"
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
-  // State booking
   const [selectedSlotId, setSelectedSlotId] = useState<number>(1);
   const [selectedStartTime, setSelectedStartTime] = useState<string>('07:30:00');
   const [selectedEndTime, setSelectedEndTime] = useState<string>('09:00:00');
   const [purpose, setPurpose] = useState<string>('');
-  const [isBooking, setIsBooking] = useState(false); 
   const { toast } = useToast();
 
   const userBookings = mockBookings.filter(b => b.userEmail === user?.email);
@@ -71,7 +64,6 @@ const UserDashboard = () => {
     updateCampus(campus as any);
   };
 
-  // --- API Calls (Giữ nguyên) ---
   useEffect(() => {
     const fetchFacilities = async () => {
       const proxyUrl = '/api/Faciliti/List';
@@ -108,7 +100,6 @@ const UserDashboard = () => {
     fetchSlots();
   }, []);
 
-  // --- Filtering Logic (Giữ nguyên) ---
   const filteredFacilities = useMemo(() => {
     const sourceData = facilities.length > 0 ? facilities : mockRooms;
     const normalizedData: Room[] = sourceData.map((item: any) => {
@@ -135,17 +126,14 @@ const UserDashboard = () => {
     });
   }, [facilities, user?.campus, searchTerm]);
 
-  // --- HÀM XỬ LÝ SỰ KIỆN ĐÃ SỬA ---
   const handleViewDetails = (room: Room) => {
     setSelectedRoom(room);
-    setIsBooking(false); // Chế độ xem chi tiết
-    setShowDetailModal(true); // Mở Modal Chi tiết
+    setShowDetailModal(true);
   };
 
   const handleBookNow = (room: Room) => {
     setSelectedRoom(room);
-    setIsBooking(true); // Chế độ Booking
-    setShowBookingModal(true); // Mở thẳng Modal Booking
+    setShowBookingModal(true);
   };
 
   return (
@@ -156,7 +144,6 @@ const UserDashboard = () => {
       
       <main className="container py-10 space-y-10 animate-fade-in">
         
-        {/* Top Section */}
         <div className="flex flex-col md:flex-row items-end justify-between gap-6">
           <div className="space-y-2">
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
@@ -181,9 +168,7 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="space-y-6">
-          {/* Search Bar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 sticky top-4 z-30 bg-white/80 backdrop-blur-xl p-4 rounded-2xl shadow-md border border-white/50">
              <div className="flex items-center gap-2">
                 <div className="bg-orange-100 p-2 rounded-lg text-orange-600">
@@ -206,7 +191,6 @@ const UserDashboard = () => {
              </div>
           </div>
 
-          {/* Room Grid */}
           <Card className="border-0 bg-transparent shadow-none">
             <CardContent className="p-0">
               {filteredFacilities.length === 0 ? (
@@ -218,7 +202,7 @@ const UserDashboard = () => {
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {filteredFacilities.map((roomObj, idx) => {
+                  {filteredFacilities.map((roomObj) => {
                     const statusColor = roomObj.status === 'Available' ? 'text-emerald-600 bg-emerald-50' : 'text-orange-600 bg-orange-50';
                     const borderColor = roomObj.status === 'Available' ? 'group-hover:border-emerald-200' : 'group-hover:border-orange-200';
 
@@ -265,7 +249,6 @@ const UserDashboard = () => {
                           )}
 
                           <div className="flex gap-2 mt-2">
-                              {/* Nút 1: Xem chi tiết */}
                               <Button 
                                 variant="outline"
                                 className="flex-1 font-semibold text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600 h-10 rounded-xl transition-all"
@@ -275,7 +258,6 @@ const UserDashboard = () => {
                                 Chi tiết
                               </Button>
 
-                              {/* Nút 2: Đặt ngay (Mở thẳng modal booking) */}
                               <Button 
                                 className={`flex-1 font-semibold shadow-md transition-all duration-300 h-10 rounded-xl
                                     ${roomObj.status === 'Available' 
@@ -304,7 +286,7 @@ const UserDashboard = () => {
         </div>
       </main>
 
-      {/* --- MODAL 1: XEM CHI TIẾT --- */}
+      {/* Modal Chi tiết */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 rounded-2xl shadow-2xl">
             {selectedRoom && (
@@ -312,7 +294,6 @@ const UserDashboard = () => {
                 room={selectedRoom} 
                 onClose={() => setShowDetailModal(false)}
                 onBooking={() => {
-                    // Nếu bấm nút đặt trong modal chi tiết, chuyển sang modal booking
                     setShowDetailModal(false);
                     setShowBookingModal(true);
                 }}
@@ -327,7 +308,7 @@ const UserDashboard = () => {
                 setSelectedEndTime={setSelectedEndTime}
                 purpose={purpose}
                 setPurpose={setPurpose}
-                isBooking={false} // Luôn là false vì đây là modal chi tiết
+                initialMode="details"
                 user={user}
                 toast={toast}
                 onBookingComplete={() => setShowDetailModal(false)}
@@ -336,14 +317,13 @@ const UserDashboard = () => {
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL 2: ĐẶT PHÒNG NGAY --- */}
+      {/* Modal Đặt phòng */}
       <Dialog open={showBookingModal} onOpenChange={setShowBookingModal}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto p-0 border-0 rounded-2xl shadow-2xl">
             {selectedRoom && (
             <RoomDetailModal 
                 room={selectedRoom} 
                 onClose={() => setShowBookingModal(false)}
-                // Không cần onBooking vì đang ở trong booking rồi
                 onBooking={() => {}}
                 slots={slots}
                 minDate={minDate}
@@ -356,7 +336,7 @@ const UserDashboard = () => {
                 setSelectedEndTime={setSelectedEndTime}
                 purpose={purpose}
                 setPurpose={setPurpose}
-                isBooking={true} // Luôn là true để hiển thị form đặt phòng
+                initialMode="booking"
                 user={user}
                 toast={toast}
                 onBookingComplete={() => setShowBookingModal(false)}
