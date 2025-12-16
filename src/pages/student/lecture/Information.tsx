@@ -48,6 +48,8 @@ const Information = () => {
   const [bookingDetail, setBookingDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancellingBooking, setCancellingBooking] = useState<any>(null);
   const [stats, setStats] = useState<any>({
     totalBookings: 0,
     successRate: 0,
@@ -90,6 +92,8 @@ const Information = () => {
               else if (apiStatus === 'cancel' || apiStatus === 'cancelled') statusNorm = 'Cancelled';
               else if (apiStatus === 'conflict') statusNorm = 'Conflict';
               else if (apiStatus === 'feedbacked' ) statusNorm = 'Feedbacked';
+              else if (apiStatus === 'checkedin') statusNorm = 'CheckedIn';
+              else if (apiStatus === 'checkedout') statusNorm = 'CheckedOut';
 
               return {
                 id: b.bookingId,
@@ -172,6 +176,14 @@ const Information = () => {
         className = "bg-green-50 text-green-600 border-green-200";
         label = "Đã đánh giá";
         break;
+      case 'CheckedIn':
+        className = "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200";
+        label = "Đã check-in";
+        break;
+      case 'CheckedOut':
+        className = "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200";
+        label = "Đã check-out";
+        break;
       case 'Rejected':
         className = "bg-red-100 text-red-700 hover:bg-red-200 border-red-200";
         label = "Từ chối";
@@ -234,7 +246,7 @@ const Information = () => {
         const newId = data.id ?? data.feedbackId ?? (existingId > 0 ? existingId : 1); 
         setBookings(prev => prev.map(b => 
           b.id === editingBooking.id 
-            ? {...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating} 
+            ? {...b, feedbackId: newId, comment: reviewDesc, rating: reviewRating, status: 'Feedbacked'} 
             : b
         ));
         toast?.({ title: 'Thành công', description: 'Đã lưu đánh giá' });
@@ -267,7 +279,7 @@ const Information = () => {
       if (res.ok) {
         setBookings(prev => prev.map(b => 
           b.id === editingBooking.id 
-            ? {...b, feedbackId: 0, comment: '', rating: 0} 
+            ? {...b, feedbackId: 0, comment: '', rating: 0, status: 'CheckedOut'} 
             : b
         ));
         toast?.({ 
@@ -290,6 +302,110 @@ const Information = () => {
       toast?.({ 
         title: 'Lỗi mạng', 
         description: 'Lỗi khi xóa đánh giá', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancellingBooking) return;
+    
+    try {
+      const res = await fetch(`/api/Booking/Cancel/${cancellingBooking.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(prev => prev.map(b => 
+          b.id === cancellingBooking.id 
+            ? {...b, status: 'Cancelled'} 
+            : b
+        ));
+        toast?.({ 
+          title: 'Thành công', 
+          description: 'Đã hủy đặt phòng thành công' 
+        });
+        setCancelConfirmOpen(false);
+        setCancellingBooking(null);
+      } else {
+        toast?.({ 
+          title: 'Lỗi', 
+          description: 'Không thể hủy đặt phòng', 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err) {
+      toast?.({ 
+        title: 'Lỗi mạng', 
+        description: 'Lỗi khi hủy đặt phòng', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleCheckIn = async (bookingId: number) => {
+    try {
+      const res = await fetch(`/api/Booking/CheckIn/${bookingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (res.ok) {
+        setBookings(prev => prev.map(b => 
+          b.id === bookingId 
+            ? {...b, status: 'CheckedIn'} 
+            : b
+        ));
+        toast?.({ 
+          title: 'Thành công', 
+          description: 'Check-in thành công' 
+        });
+      } else {
+        toast?.({ 
+          title: 'Lỗi', 
+          description: 'Không thể check-in do chưa đến giờ ', 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err) {
+      toast?.({ 
+        title: 'Lỗi mạng', 
+        description: 'Lỗi khi check-in', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleCheckOut = async (bookingId: number) => {
+    try {
+      const res = await fetch(`/api/Booking/CheckOut/${bookingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (res.ok) {
+        setBookings(prev => prev.map(b => 
+          b.id === bookingId 
+            ? {...b, status: 'CheckedOut'} 
+            : b
+        ));
+        toast?.({ 
+          title: 'Thành công', 
+          description: 'Check-out thành công. Vui lòng đánh giá!' 
+        });
+      } else {
+        toast?.({ 
+          title: 'Lỗi', 
+          description: 'Không thể check-out', 
+          variant: 'destructive' 
+        });
+      }
+    } catch (err) {
+      toast?.({ 
+        title: 'Lỗi mạng', 
+        description: 'Lỗi khi check-out', 
         variant: 'destructive' 
       });
     }
@@ -425,7 +541,45 @@ const Information = () => {
                                     Chi tiết
                                   </Button>
 
-                                  {booking.status === 'Approved' || booking.status === 'Feedbacked' ? (
+                                  {/* Cancel button - for Approved or Conflict status */}
+                                  {(booking.status === 'Approved' || booking.status === 'Conflict') && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-8 text-xs font-medium rounded-lg"
+                                      onClick={() => {
+                                        setCancellingBooking(booking);
+                                        setCancelConfirmOpen(true);
+                                      }}
+                                    >
+                                      Hủy
+                                    </Button>
+                                  )}
+
+                                  {/* Check-in button - for Approved status */}
+                                  {booking.status === 'Approved' && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 h-8 text-xs font-medium rounded-lg border-0 shadow-sm"
+                                      onClick={() => handleCheckIn(booking.id)}
+                                    >
+                                      Check-in
+                                    </Button>
+                                  )}
+
+                                  {/* Check-out button - for CheckedIn status */}
+                                  {booking.status === 'CheckedIn' && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 h-8 text-xs font-medium rounded-lg border-0 shadow-sm"
+                                      onClick={() => handleCheckOut(booking.id)}
+                                    >
+                                      Check-out
+                                    </Button>
+                                  )}
+
+                                  {/* Feedback button - for CheckedOut or Feedbacked status */}
+                                  {(booking.status === 'CheckedOut' || booking.status === 'Feedbacked') && (
                                     <Button
                                       size="sm"
                                       className={`h-8 text-xs font-medium rounded-lg border shadow-sm transition-all ${
@@ -442,8 +596,6 @@ const Information = () => {
                                     >
                                       {booking.feedbackId > 0 ? <><Star className="h-3 w-3 mr-1 fill-orange-600" /> Sửa đánh giá</> : 'Đánh giá'}
                                     </Button>
-                                  ) : (
-                                    <div className="w-[80px]"></div>
                                   )}
                                 </div>
                               </TableCell>
@@ -665,6 +817,42 @@ const Information = () => {
               onClick={handleDeleteReview}
             >
               Xóa đánh giá
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Booking Confirmation Dialog */}
+      <Dialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px] border-0 shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                <span className="text-orange-600 text-2xl">⚠️</span>
+              </div>
+              Xác nhận hủy đặt phòng
+            </DialogTitle>
+            <DialogDescription className="text-gray-600 pt-2">
+              Bạn có chắc chắn muốn hủy đặt phòng <strong>{cancellingBooking?.roomName}</strong> vào ngày <strong>{formatDate(cancellingBooking?.date)}</strong> không?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter className="gap-2 sm:gap-0 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setCancelConfirmOpen(false);
+                setCancellingBooking(null);
+              }}
+              className="flex-1 sm:flex-none"
+            >
+              Không, giữ lại
+            </Button>
+            <Button 
+              className="flex-1 sm:flex-none bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={handleCancelBooking}
+            >
+              Có, hủy đặt phòng
             </Button>
           </DialogFooter>
         </DialogContent>
