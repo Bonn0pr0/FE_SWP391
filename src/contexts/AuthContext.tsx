@@ -9,6 +9,7 @@ export interface User {
   token: string;
   roleId: number;
   role: UserRole;
+  fullName?: string;
   campus?: 'campus1' | 'campus2';
 }
 
@@ -19,12 +20,23 @@ interface LoginResponse {
   userId: number;
   email: string;
   roleId: number;
+  fullName?: string;
+}
+
+interface GoogleLoginResponse {
+  token: string;
+  refreshToken: string;
+  expires: string;
+  userId: number;
+  email: string;
+  roleId: number;
+  fullName?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  // Trả về số (roleId) nếu thành công, null nếu thất bại
-  login: (email: string, password: string) => Promise<number | null>; 
+  login: (email: string, password: string) => Promise<number | null>;
+  loginWithGoogle: (idToken: string) => Promise<number | null>;
   logout: () => void;
   updateCampus: (campus: 'campus1' | 'campus2') => void;
   isAuthenticated: boolean;
@@ -33,8 +45,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // --- Config ---
-// Nếu bạn muốn dùng Proxy, hãy đổi thành "/api/Auth/login"
-const API_URL = '/api/Auth/login';
+const API_LOGIN_URL = '/api/Auth/login';
+const API_GOOGLE_LOGIN_URL = '/api/Auth/google-login'; // Endpoint cho Google Login
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -62,15 +74,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Login thường
   const login = async (email: string, password: string): Promise<number | null> => {
     try {
-      console.log(`🚀 Sending login request to: ${API_URL}`);
-
-      const response = await fetch(API_URL, {
+      console.log(`🚀 Sending login request to: ${API_LOGIN_URL}`);
+      const response = await fetch(API_LOGIN_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Không thêm các header lạ để tránh trigger preflight phức tạp
         },
         body: JSON.stringify({ email, password })
       });
@@ -78,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.ok) {
         const data: LoginResponse = await response.json();
         console.log("✅ Login success:", data);
-
+        
         const userRoleStr = mapRoleIdToRole(data.roleId);
         const userData: User = {
           userId: data.userId,
@@ -86,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           token: data.token,
           roleId: data.roleId,
           role: userRoleStr,
+          fullName: data.fullName,
           campus: userRoleStr !== 'admin' ? 'campus1' : undefined 
         };
 
@@ -100,9 +112,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
     } catch (error) {
-      // Đây là nơi lỗi CORS hoặc SSL sẽ nhảy vào
       console.error("🔥 NETWORK ERROR (CORS/SSL):", error);
       console.log("👉 Gợi ý: Kiểm tra xem API có đang chạy không? Đã accept chứng chỉ SSL chưa?");
+      return null;
+    }
+  };
+
+  // Login với Google
+  const loginWithGoogle = async (idToken: string): Promise<number | null> => {
+    try {
+      console.log(`🚀 Sending Google login request to: ${API_GOOGLE_LOGIN_URL}`);
+      const response = await fetch(API_GOOGLE_LOGIN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken })
+      });
+
+      if (response.ok) {
+        const data: GoogleLoginResponse = await response.json();
+        console.log("✅ Google login success:", data);
+        
+        const userRoleStr = mapRoleIdToRole(data.roleId);
+        const userData: User = {
+          userId: data.userId,
+          email: data.email,
+          token: data.token,
+          roleId: data.roleId,
+          role: userRoleStr,
+          fullName: data.fullName,
+          campus: userRoleStr !== 'admin' ? 'campus1' : undefined 
+        };
+
+        setUser(userData);
+        localStorage.setItem('accessToken', data.token);
+        localStorage.setItem('fptu_user', JSON.stringify(userData));
+        
+        return data.roleId; 
+      } else {
+        const errorText = await response.text();
+        console.error("❌ Google login rejected:", response.status, errorText);
+        return null;
+      }
+    } catch (error) {
+      console.error("🔥 Google login error:", error);
       return null;
     }
   };
@@ -122,7 +176,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateCampus, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      loginWithGoogle,
+      logout, 
+      updateCampus, 
+      isAuthenticated: !!user 
+    }}>
       {children}
     </AuthContext.Provider>
   );

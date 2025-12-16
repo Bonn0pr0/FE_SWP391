@@ -222,7 +222,7 @@ const UserDashboard = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <Input
                   type="search"
-                  placeholder="Tìm theo tên phòng hoặc loại phòng..."
+                  placeholder="Tìm theo tên phòng hoặc loại phòng..." 
                   className="pl-10 h-11 rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-200 transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -232,10 +232,10 @@ const UserDashboard = () => {
 
           {/* 3. KHU VỰC LỌC NHANH (QUICK FILTER) */}
           <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2 shrink-0">
+            {/* <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2 shrink-0">
                 <Filter className="h-4 w-4" />
                 Lọc nhanh:
-            </div>
+            </div> */}
             
             {/* Nút "Tất cả" */}
             <Button 
