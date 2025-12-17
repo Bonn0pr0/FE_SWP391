@@ -166,7 +166,7 @@ export const Header = () => {
               )}
 
               <Button variant="outline" size="sm" asChild>
-                <Link to={user?.role === 'admin' ? '/admin' : '/ '}>
+                <Link to={user?.role === 'admin' ? '/admin' : '/information'}>
                   {user?.email.split('@')[0]}
                 </Link>
               </Button>
