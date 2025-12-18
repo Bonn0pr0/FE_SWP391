@@ -50,6 +50,11 @@ const Information = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<any>(null);
+  const [checkInOpen, setCheckInOpen] = useState(false);
+  const [checkOutOpen, setCheckOutOpen] = useState(false);
+  const [checkingBooking, setCheckingBooking] = useState<any>(null);
+  const [checkComment, setCheckComment] = useState('');
+  const [checkImages, setCheckImages] = useState<File[]>([]);
   const [stats, setStats] = useState<any>({
     totalBookings: 0,
     successRate: 0,
@@ -345,16 +350,26 @@ const Information = () => {
     }
   };
 
-  const handleCheckIn = async (bookingId: number) => {
+  const handleCheckIn = async () => {
+    if (!checkingBooking) return;
+    
     try {
-      const res = await fetch(`/api/Booking/CheckIn/${bookingId}`, {
+      const formData = new FormData();
+      formData.append('bookingId', checkingBooking.id.toString());
+      formData.append('comment', checkComment);
+      
+      checkImages.forEach((file) => {
+        formData.append('imageUrls', file);
+      });
+
+      const res = await fetch(`/api/Booking/CheckIn/${checkingBooking.id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        body: formData
       });
       
       if (res.ok) {
         setBookings(prev => prev.map(b => 
-          b.id === bookingId 
+          b.id === checkingBooking.id 
             ? {...b, status: 'CheckedIn'} 
             : b
         ));
@@ -362,6 +377,10 @@ const Information = () => {
           title: 'Thành công', 
           description: 'Check-in thành công' 
         });
+        setCheckInOpen(false);
+        setCheckComment('');
+        setCheckImages([]);
+        setCheckingBooking(null);
       } else {
         toast?.({ 
           title: 'Lỗi', 
@@ -378,16 +397,26 @@ const Information = () => {
     }
   };
 
-  const handleCheckOut = async (bookingId: number) => {
+  const handleCheckOut = async () => {
+    if (!checkingBooking) return;
+    
     try {
-      const res = await fetch(`/api/Booking/CheckOut/${bookingId}`, {
+      const formData = new FormData();
+      formData.append('bookingId', checkingBooking.id.toString());
+      formData.append('comment', checkComment);
+      
+      checkImages.forEach((file) => {
+        formData.append('imageUrls', file);
+      });
+
+      const res = await fetch(`/api/Booking/CheckOut/${checkingBooking.id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        body: formData
       });
       
       if (res.ok) {
         setBookings(prev => prev.map(b => 
-          b.id === bookingId 
+          b.id === checkingBooking.id 
             ? {...b, status: 'CheckedOut'} 
             : b
         ));
@@ -395,6 +424,10 @@ const Information = () => {
           title: 'Thành công', 
           description: 'Check-out thành công. Vui lòng đánh giá!' 
         });
+        setCheckOutOpen(false);
+        setCheckComment('');
+        setCheckImages([]);
+        setCheckingBooking(null);
       } else {
         toast?.({ 
           title: 'Lỗi', 
@@ -409,6 +442,17 @@ const Information = () => {
         variant: 'destructive' 
       });
     }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setCheckImages(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setCheckImages(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -561,7 +605,12 @@ const Information = () => {
                                     <Button
                                       size="sm"
                                       className="bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 h-8 text-xs font-medium rounded-lg border-0 shadow-sm"
-                                      onClick={() => handleCheckIn(booking.id)}
+                                      onClick={() => {
+                                        setCheckingBooking(booking);
+                                        setCheckComment('');
+                                        setCheckImages([]);
+                                        setCheckInOpen(true);
+                                      }}
                                     >
                                       Check-in
                                     </Button>
@@ -572,7 +621,12 @@ const Information = () => {
                                     <Button
                                       size="sm"
                                       className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 h-8 text-xs font-medium rounded-lg border-0 shadow-sm"
-                                      onClick={() => handleCheckOut(booking.id)}
+                                      onClick={() => {
+                                        setCheckingBooking(booking);
+                                        setCheckComment('');
+                                        setCheckImages([]);
+                                        setCheckOutOpen(true);
+                                      }}
                                     >
                                       Check-out
                                     </Button>
@@ -853,6 +907,150 @@ const Information = () => {
               onClick={handleCancelBooking}
             >
               Có, hủy đặt phòng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-in Dialog */}
+      <Dialog open={checkInOpen} onOpenChange={setCheckInOpen}>
+        <DialogContent className="sm:max-w-[500px] border-0 shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold text-gray-800">Check-in phòng</DialogTitle>
+            <DialogDescription className="text-center">Ghi chú và chụp ảnh trạng thái phòng khi bắt đầu sử dụng</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Ghi chú (tùy chọn)</label>
+              <textarea
+                value={checkComment}
+                onChange={(e) => setCheckComment(e.target.value)}
+                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none min-h-[80px] bg-gray-50 resize-none transition-all"
+                placeholder="Ghi chú về tình trạng phòng lúc nhận..."
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Hình ảnh (tùy chọn)</label>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-purple-400 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id="checkin-image-upload"
+                />
+                <label htmlFor="checkin-image-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                  <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
+                    <span className="text-2xl">📷</span>
+                  </div>
+                  <p className="text-sm text-gray-600">Nhấn để chọn ảnh</p>
+                </label>
+              </div>
+
+              {checkImages.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {checkImages.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCheckInOpen(false)} className="flex-1 sm:flex-none">Hủy</Button>
+            <Button 
+              className="flex-1 sm:flex-none bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg shadow-purple-200 border-0"
+              onClick={handleCheckIn}
+            >
+              Xác nhận Check-in
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-out Dialog */}
+      <Dialog open={checkOutOpen} onOpenChange={setCheckOutOpen}>
+        <DialogContent className="sm:max-w-[500px] border-0 shadow-2xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold text-gray-800">Check-out phòng</DialogTitle>
+            <DialogDescription className="text-center">Ghi chú và chụp ảnh trạng thái phòng khi kết thúc sử dụng</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Ghi chú (tùy chọn)</label>
+              <textarea
+                value={checkComment}
+                onChange={(e) => setCheckComment(e.target.value)}
+                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none min-h-[80px] bg-gray-50 resize-none transition-all"
+                placeholder="Ghi chú về tình trạng phòng lúc trả..."
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Hình ảnh (tùy chọn)</label>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-indigo-400 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="hidden"
+                  id="checkout-image-upload"
+                />
+                <label htmlFor="checkout-image-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                  <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <span className="text-2xl">📷</span>
+                  </div>
+                  <p className="text-sm text-gray-600">Nhấn để chọn ảnh</p>
+                </label>
+              </div>
+
+              {checkImages.length > 0 && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {checkImages.map((file, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-lg"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCheckOutOpen(false)} className="flex-1 sm:flex-none">Hủy</Button>
+            <Button 
+              className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-200 border-0"
+              onClick={handleCheckOut}
+            >
+              Xác nhận Check-out
             </Button>
           </DialogFooter>
         </DialogContent>
