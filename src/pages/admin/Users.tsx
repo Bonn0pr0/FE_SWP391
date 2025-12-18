@@ -19,9 +19,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, UserPlus, Loader2, Trash2, RefreshCw, Eye, EyeOff, Pencil } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  Search,
+  UserPlus,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Pencil,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
@@ -35,7 +61,7 @@ interface User {
 
 // ⚠️ QUAN TRỌNG: Hãy đổi PORT này thành PORT backend .NET của bạn (Ví dụ: 44338, 7001, 5000...)
 // Kiểm tra file launchSettings.json trong Visual Studio để biết chính xác.
-const BACKEND_DOMAIN = ""; 
+const BACKEND_DOMAIN = "";
 const API_BASE_URL = `${BACKEND_DOMAIN}/api/User`;
 
 export default function Users() {
@@ -43,7 +69,7 @@ export default function Users() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // State Dialog & Edit
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -51,7 +77,7 @@ export default function Users() {
 
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -70,29 +96,40 @@ export default function Users() {
       const response = await fetch(`${API_BASE_URL}/Infor`);
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
-      
+
       const mappedUsers = data.map((u: any) => ({
         ...u,
         fullName: u.name, // Map name từ API sang fullName
-        phone: u.phone || "N/A"
+        phone: u.phone || "N/A",
       }));
       setUsers(mappedUsers);
     } catch (error) {
       console.error(error);
-      toast({ title: "Lỗi tải danh sách", description: "Kiểm tra lại Backend Server có đang chạy không?", variant: "destructive" });
+      toast({
+        title: "Lỗi tải danh sách",
+        description: "Kiểm tra lại Backend Server có đang chạy không?",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // 2. Reset Form khi mở modal Thêm mới
   const handleOpenAdd = () => {
     setIsEditing(false);
     setFormData({
-      fullName: "", email: "", password: "", phone: "", 
-      organization: "FPT University", roleName: "Student", status: "Active"
+      fullName: "",
+      email: "",
+      password: "",
+      phone: "",
+      organization: "FPT University",
+      roleName: "Student",
+      status: "Active",
     });
     setIsDialogOpen(true);
   };
@@ -104,11 +141,11 @@ export default function Users() {
     setFormData({
       fullName: user.fullName,
       email: user.email,
-      password: "", 
+      password: "",
       phone: user.phone === "N/A" ? "" : user.phone || "",
       organization: "FPT University",
       roleName: user.roleName,
-      status: user.status
+      status: user.status,
     });
     setIsDialogOpen(true);
   };
@@ -117,7 +154,11 @@ export default function Users() {
   const handleSaveUser = async () => {
     // Validate cơ bản
     if (!formData.fullName || !formData.email) {
-      toast({ title: "Thiếu thông tin", description: "Vui lòng nhập Tên và Email", variant: "destructive" });
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng nhập Tên và Email",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -128,14 +169,14 @@ export default function Users() {
       if (isEditing && currentUserId) {
         // --- LOGIC SỬA (UPDATE) ---
         // Thường là PUT vào /api/User/{id} hoặc /api/User/Update/{id}
-        url = `${API_BASE_URL}/${currentUserId}`; 
-        method = 'PUT';
+        url = `${API_BASE_URL}/${currentUserId}`;
+        method = "PUT";
       } else {
         // --- LOGIC THÊM MỚI (CREATE) ---
         // ⚠️ QUAN TRỌNG: Thử endpoint /Create hoặc /Register
         // Vì bạn dùng /Infor nên endpoint tạo mới 99% là /Create
-        url = `${API_BASE_URL}/Create`; 
-        method = 'POST';
+        url = `${API_BASE_URL}/Create`;
+        method = "POST";
       }
 
       console.log(`Calling API: ${method} ${url}`, formData); // Log để debug
@@ -143,17 +184,19 @@ export default function Users() {
       const response = await fetch(url, {
         method: method,
         headers: {
-          'Content-Type': 'application/json',
-          'accept': '*/*'
+          "Content-Type": "application/json",
+          accept: "*/*",
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       });
 
       // Kiểm tra response
       if (response.ok || response.status === 201 || response.status === 204) {
         toast({
           title: "Thành công",
-          description: isEditing ? "Cập nhật thành công" : "Thêm mới thành công",
+          description: isEditing
+            ? "Cập nhật thành công"
+            : "Thêm mới thành công",
           className: "bg-green-600 text-white",
         });
         setIsDialogOpen(false);
@@ -164,19 +207,21 @@ export default function Users() {
         console.error("Server Error:", errorText);
         throw new Error(errorText || `Lỗi HTTP ${response.status}`);
       }
-
     } catch (error: any) {
       console.error("Save User Error:", error);
-      
-      let errorMsg = "Không thể lưu dữ liệu.";
-      if (error.message.includes("405")) errorMsg = "Lỗi 405: Sai đường dẫn API (Method Not Allowed).";
-      if (error.message.includes("404")) errorMsg = "Lỗi 404: Không tìm thấy API (Sai đường dẫn).";
-      if (error.message.includes("Failed to fetch")) errorMsg = "Lỗi kết nối: Server chưa chạy hoặc sai PORT.";
 
-      toast({ 
-        title: "Lỗi", 
-        description: errorMsg, 
-        variant: "destructive" 
+      let errorMsg = "Không thể lưu dữ liệu.";
+      if (error.message.includes("405"))
+        errorMsg = "Lỗi 405: Sai đường dẫn API (Method Not Allowed).";
+      if (error.message.includes("404"))
+        errorMsg = "Lỗi 404: Không tìm thấy API (Sai đường dẫn).";
+      if (error.message.includes("Failed to fetch"))
+        errorMsg = "Lỗi kết nối: Server chưa chạy hoặc sai PORT.";
+
+      toast({
+        title: "Lỗi",
+        description: errorMsg,
+        variant: "destructive",
       });
     }
   };
@@ -184,9 +229,14 @@ export default function Users() {
   // 5. Xóa User
   const handleDeleteUser = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE_URL}/${id}`, {
+        method: "DELETE",
+      });
       if (response.ok || response.status === 204) {
-        toast({ title: "Đã xóa thành công", className: "bg-green-600 text-white" });
+        toast({
+          title: "Đã xóa thành công",
+          className: "bg-green-600 text-white",
+        });
         fetchUsers();
       } else {
         throw new Error("Delete failed");
@@ -196,25 +246,29 @@ export default function Users() {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    (roleFilter === "all" || user.roleName === roleFilter) &&
-    (user.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || user.email?.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredUsers = users.filter(
+    (user) =>
+      (roleFilter === "all" || user.roleName === roleFilter) &&
+      (user.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Quản lý người dùng</h1>
+          <h1 className="text-3xl font-bold text-blue-600">
+            Quản lý người dùng
+          </h1>
           <p className="text-muted-foreground">Danh sách người dùng FPTU</p>
         </div>
         <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={fetchUsers}>
-                <RefreshCw className={isLoading ? "animate-spin" : ""} />
-            </Button>
-            <Button onClick={handleOpenAdd} className="bg-primary">
-                <UserPlus className="mr-2 h-4 w-4" /> Thêm mới
-            </Button>
+          <Button variant="outline" size="icon" onClick={fetchUsers}>
+            <RefreshCw className={isLoading ? "animate-spin" : ""} />
+          </Button>
+          <Button onClick={handleOpenAdd} className="bg-primary">
+            <UserPlus className="mr-2 h-4 w-4" /> Thêm mới
+          </Button>
         </div>
       </div>
 
@@ -222,22 +276,24 @@ export default function Users() {
         <CardContent className="pt-6">
           <div className="flex gap-4 mb-6">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-              <Input 
-                placeholder="Tìm kiếm..." 
+              <Search className="absolute left-3 top-3 h-4 w-4 text-orange-500" />
+              <Input
+                placeholder="Tìm kiếm..."
                 className="pl-10"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Vai trò" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="Facility Admin">Facility Admin</SelectItem>
-                    <SelectItem value="Lecturer">Lecturer</SelectItem>
-                    <SelectItem value="Student">Student</SelectItem>
-                </SelectContent>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Vai trò" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                <SelectItem value="Facility Admin">Facility Admin</SelectItem>
+                <SelectItem value="Lecturer">Lecturer</SelectItem>
+                <SelectItem value="Student">Student</SelectItem>
+              </SelectContent>
             </Select>
           </div>
 
@@ -255,37 +311,56 @@ export default function Users() {
               <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.fullName}</TableCell>
+                    <TableCell className="font-medium">
+                      {user.fullName}
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell><Badge variant="outline">{user.roleName}</Badge></TableCell>
                     <TableCell>
-                        <span className={`text-sm font-bold ${user.status === 'Active' ? 'text-green-600' : 'text-red-500'}`}>
-                            {user.status}
-                        </span>
+                      <Badge variant="outline">{user.roleName}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`text-sm font-bold ${
+                          user.status === "Active"
+                            ? "text-green-600"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {user.status}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(user)}>
-                            <Pencil className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle>
-                                    <AlertDialogDescription>Không thể hoàn tác hành động này.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteUser(user.id)} className="bg-red-600">
-                                        Xóa
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(user)}
+                      >
+                        <Pencil className="h-4 w-4 text-blue-600" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Xác nhận xóa?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Không thể hoàn tác hành động này.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Hủy</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="bg-red-600"
+                            >
+                              Xóa
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -297,51 +372,99 @@ export default function Users() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-                <DialogTitle>{isEditing ? "Cập nhật thông tin" : "Thêm người dùng mới"}</DialogTitle>
-                <DialogDescription>{isEditing ? "Sửa thông tin chi tiết." : "Tạo tài khoản mới."}</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                    <Label>Họ và Tên</Label>
-                    <Input value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                    <Label>Mật khẩu {isEditing && "(Để trống nếu không đổi)"}</Label>
-                    <div className="relative">
-                        <Input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                        <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowPassword(!showPassword)}>
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Số điện thoại</Label>
-                        <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Vai trò</Label>
-                        <Select value={formData.roleName} onValueChange={v => setFormData({...formData, roleName: v})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Student">Student</SelectItem>
-                                <SelectItem value="Lecturer">Lecturer</SelectItem>
-                                <SelectItem value="Facility Admin">Facility Admin</SelectItem>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditing ? "Cập nhật thông tin" : "Thêm người dùng mới"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditing ? "Sửa thông tin chi tiết." : "Tạo tài khoản mới."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Họ và Tên</Label>
+              <Input
+                value={formData.fullName}
+                onChange={(e) =>
+                  setFormData({ ...formData, fullName: e.target.value })
+                }
+              />
             </div>
-            <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Hủy</Button>
-                <Button onClick={handleSaveUser}>{isEditing ? "Lưu" : "Tạo mới"}</Button>
-            </DialogFooter>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Mật khẩu {isEditing && "(Để trống nếu không đổi)"}</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Số điện thoại</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Vai trò</Label>
+                <Select
+                  value={formData.roleName}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, roleName: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Student">Student</SelectItem>
+                    <SelectItem value="Lecturer">Lecturer</SelectItem>
+                    <SelectItem value="Facility Admin">
+                      Facility Admin
+                    </SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveUser}>
+              {isEditing ? "Lưu" : "Tạo mới"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
