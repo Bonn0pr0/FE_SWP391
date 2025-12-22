@@ -37,7 +37,7 @@ const Login = () => {
   // Hàm điều hướng tập trung theo Role
   const redirectByUserRole = (roleId: number) => {
     if (roleId === 1) {
-      navigate("/admin?section=booking-history");
+      navigate("/admin?section=users"); // Đã cập nhật: Role 1 vào Admin Dashboard
     } else if (roleId === 2 || roleId === 3) {
       navigate("/dashboard"); // Đã cập nhật: Role 2, 3 vào Dashboard
     } else {
