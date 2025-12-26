@@ -350,21 +350,56 @@ const Information = () => {
     }
   };
 
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'checkin_photos'); // Tạo preset này trong Cloudinary Settings
+    
+    try {
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/dluhldkjf/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.secure_url; // URL ảnh từ Cloudinary
+      }
+      
+      throw new Error('Upload to Cloudinary failed');
+    } catch (error) {
+      console.error('Cloudinary upload error:', error);
+      throw error;
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!checkingBooking) return;
     
     try {
-      const formData = new FormData();
-      formData.append('bookingId', checkingBooking.id.toString());
-      formData.append('comment', checkComment);
+      // Bước 1: Upload tất cả ảnh lên Cloudinary
+      const uploadPromises = checkImages.map(file => uploadToCloudinary(file));
+      const imageUrls = await Promise.all(uploadPromises);
       
-      checkImages.forEach((file) => {
-        formData.append('imageUrls', file);
-      });
+      // Lọc ra những URL upload thành công
+      const successUrls = imageUrls.filter(url => url && url.length > 0);
+      
+      // Bước 2: Gửi JSON request với Cloudinary URLs
+      const payload = {
+        bookingId: checkingBooking.id,
+        comment: checkComment || '',
+        imageUrls: successUrls
+      };
 
       const res = await fetch(`/api/Booking/CheckIn/${checkingBooking.id}`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
       });
       
       if (res.ok) {
@@ -382,16 +417,17 @@ const Information = () => {
         setCheckImages([]);
         setCheckingBooking(null);
       } else {
+        const errorText = await res.text();
         toast?.({ 
           title: 'Lỗi', 
-          description: 'Không thể check-in do chưa đến giờ ', 
+          description: errorText || 'Không thể check-in', 
           variant: 'destructive' 
         });
       }
     } catch (err) {
       toast?.({ 
-        title: 'Lỗi mạng', 
-        description: 'Lỗi khi check-in', 
+        title: 'Lỗi', 
+        description: 'Lỗi khi upload ảnh hoặc check-in', 
         variant: 'destructive' 
       });
     }
@@ -401,17 +437,26 @@ const Information = () => {
     if (!checkingBooking) return;
     
     try {
-      const formData = new FormData();
-      formData.append('bookingId', checkingBooking.id.toString());
-      formData.append('comment', checkComment);
+      // Bước 1: Upload tất cả ảnh lên Cloudinary
+      const uploadPromises = checkImages.map(file => uploadToCloudinary(file));
+      const imageUrls = await Promise.all(uploadPromises);
       
-      checkImages.forEach((file) => {
-        formData.append('imageUrls', file);
-      });
+      // Lọc ra những URL upload thành công
+      const successUrls = imageUrls.filter(url => url && url.length > 0);
+      
+      // Bước 2: Gửi JSON request với Cloudinary URLs
+      const payload = {
+        bookingId: checkingBooking.id,
+        comment: checkComment || '',
+        imageUrls: successUrls
+      };
 
       const res = await fetch(`/api/Booking/CheckOut/${checkingBooking.id}`, {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
       });
       
       if (res.ok) {
@@ -429,16 +474,17 @@ const Information = () => {
         setCheckImages([]);
         setCheckingBooking(null);
       } else {
+        const errorText = await res.text();
         toast?.({ 
           title: 'Lỗi', 
-          description: 'Không thể check-out', 
+          description: errorText || 'Không thể check-out', 
           variant: 'destructive' 
         });
       }
     } catch (err) {
       toast?.({ 
-        title: 'Lỗi mạng', 
-        description: 'Lỗi khi check-out', 
+        title: 'Lỗi', 
+        description: 'Lỗi khi upload ảnh hoặc check-out', 
         variant: 'destructive' 
       });
     }
@@ -729,7 +775,7 @@ const Information = () => {
       </div>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-[650px] border-0 shadow-2xl rounded-2xl p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto border-0 shadow-2xl rounded-2xl p-0">
           <DialogHeader className="bg-gradient-to-r from-blue-600 to-blue-500 p-6 text-white">
             <DialogTitle className="text-xl">Chi tiết đặt phòng</DialogTitle>
             <DialogDescription className="text-blue-100">Thông tin đầy đủ về yêu cầu của bạn</DialogDescription>
@@ -775,6 +821,84 @@ const Information = () => {
                     <div>
                       <label className="text-sm font-bold text-red-800 block mb-1">Lý do từ chối</label>
                       <p className="text-sm text-red-700">{bookingDetail.rejectionReason}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Check-in Section */}
+                {bookingDetail.checkIn && (
+                  <div className="space-y-3 border-t pt-4">
+                    <h4 className="font-semibold text-green-700 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      Thông tin Check-in
+                    </h4>
+                    <div className="space-y-3 rounded-lg bg-green-50 border border-green-200 p-4">
+                      <p className="text-xs text-muted-foreground">
+                        ⏰ {new Date(bookingDetail.checkIn.createAt).toLocaleString('vi-VN')}
+                      </p>
+                      {bookingDetail.checkIn.comment && (
+                        <div>
+                          <label className="text-sm font-semibold text-green-800">Ghi chú:</label>
+                          <p className="text-sm mt-1 bg-white p-2 rounded border border-green-100">"{bookingDetail.checkIn.comment}"</p>
+                        </div>
+                      )}
+                      {bookingDetail.checkIn.imageUrls && bookingDetail.checkIn.imageUrls.length > 0 && (
+                        <div>
+                          <label className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
+                            📷 Hình ảnh ({bookingDetail.checkIn.imageUrls.length})
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {bookingDetail.checkIn.imageUrls.map((url: string, idx: number) => (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={`Check-in ${idx + 1}`}
+                                className="h-24 w-full object-cover rounded-lg border-2 border-green-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Check-out Section */}
+                {bookingDetail.checkOut && (
+                  <div className="space-y-3 border-t pt-4">
+                    <h4 className="font-semibold text-blue-700 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                      Thông tin Check-out
+                    </h4>
+                    <div className="space-y-3 rounded-lg bg-blue-50 border border-blue-200 p-4">
+                      <p className="text-xs text-muted-foreground">
+                        ⏰ {new Date(bookingDetail.checkOut.createAt).toLocaleString('vi-VN')}
+                      </p>
+                      {bookingDetail.checkOut.comment && (
+                        <div>
+                          <label className="text-sm font-semibold text-blue-800">Ghi chú:</label>
+                          <p className="text-sm mt-1 bg-white p-2 rounded border border-blue-100">"{bookingDetail.checkOut.comment}"</p>
+                        </div>
+                      )}
+                      {bookingDetail.checkOut.imageUrls && bookingDetail.checkOut.imageUrls.length > 0 && (
+                        <div>
+                          <label className="text-sm font-semibold text-blue-800 flex items-center gap-2 mb-2">
+                            📷 Hình ảnh ({bookingDetail.checkOut.imageUrls.length})
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {bookingDetail.checkOut.imageUrls.map((url: string, idx: number) => (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={`Check-out ${idx + 1}`}
+                                className="h-24 w-full object-cover rounded-lg border-2 border-blue-200 cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
